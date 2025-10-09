@@ -21,6 +21,8 @@ function info() {
     echo "INFO  $*"
 }
 
+root=$(pwd)
+
 # Go through all mods we want to build
 for mod in $mods; do
     if [ ! -f "$mod/modinfo.json" ]; then
@@ -30,14 +32,15 @@ for mod in $mods; do
     fi
     version=$(cat "$mod/modinfo.json" |jq -r '.version')
     name=$(cat "$mod/modinfo.json" | jq -r '.name')
+    compile_output="$mod/bin/Release/Mods/mod/publish"
     output="Releases/${mod}_$version.zip"
 
     start $mod $version
 
-    # Remove/Overwrite old versions with the same name
-    rm -f -- "$output"
+    # Remove/Overwrite old versions with the same name and final compilation artifacts
+    rm -rf -- "$output" "$compile_output"
 
-    # Check json validity
+    # Check general json validity
     jsonfiles=$(find "$mod/assets/" -type f -name '*.json')
     for f in $jsonfiles; do
         # TODO: We may want to check the schema (based on the path the file is in)
@@ -47,14 +50,26 @@ for mod in $mods; do
         fi
     done
 
-    # TODO: Compile
+    # Compile
+    if [ -f "$mod/$mod.csproj" ]; then
+        dotnet publish "$mod/$mod.csproj" -c Release
+    fi
 
     # Build zip file
+    # I have not found a better way to do this than having separate zip commands.
     cd "$mod"
     zip -rq "../$output" \
         "assets" \
         "modinfo.json" \
         "modicon.png" \
         "README.md"
-    cd ..
+
+    # Add dll
+    if [ -f "$mod.csproj" ]; then
+        cd "bin/Release/Mods/mod/publish"
+        zip -rq "$root/$output" .
+    fi
+
+    # Reset working directory
+    cd "$root"
 done

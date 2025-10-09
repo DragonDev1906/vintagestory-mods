@@ -48,19 +48,4 @@
       <Private>False</Private>
     </Reference>
   </ItemGroup>
-
-<ItemGroup>
-  <Content Include="modinfo.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </Content>
-</ItemGroup>
-
-<!--
-<ItemGroup>
-  <Content Include="modicon.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </Content>
-</ItemGroup>
--->
-
 </Project>
