@@ -1,0 +1,14 @@
+{
+  "type": "content",
+  "modid": "betterruinsbricklayerscompat",
+  "name": "BetterRuins - Bricklayers Compatibility",
+  "authors": [
+    "Zokora"
+  ],
+  "description": "Fixes a coper dupplication option when these two mods are combined",
+  "version": "1.0.0",
+  "dependencies": {
+    "betterruins": "*",
+    "bricklayers": "*"
+  }
+}

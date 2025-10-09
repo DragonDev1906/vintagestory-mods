@@ -1,0 +1,68 @@
+[
+  { // saw + base
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/0/ingredients/B/quantity",
+    "value": 4
+  },
+  { // saw + ridge
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/1/ingredients/B/quantity",
+    "value": 4
+  },
+  { // saw + tip
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/2/ingredients/B/quantity",
+    "value": 2
+  },
+  { // ...
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/2/output/quantity",
+    "value": 1
+  },
+  { // saw + cornerinner
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/3/ingredients/B/quantity",
+    "value": 4
+  },
+  { // saw + cornerouter
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/4/ingredients/B/quantity",
+    "value": 4
+  },
+  { // chisel + base
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/5/output/quantity",
+    "value": 15
+  },
+  { // chisel + ridge
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/6/output/quantity",
+    "value": 15
+  },
+  { // chisel + tip
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/7/output/quantity",
+    "value": 20
+  },
+  { // chisel + cornerinner
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/8/output/quantity",
+    "value": 15
+  },
+  { // chisel + cornerouter
+    "file": "bricklayers:recipes/grid/recycling/block_copperroofing",
+    "op": "replace",
+    "path": "/9/output/quantity",
+    "value": 15
+  }
+]
