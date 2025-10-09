@@ -1,0 +1,10 @@
+[
+  {
+    "file": "game:blocktypes/machine/statictranslocator.json",
+    "op": "addmerge",
+    "path": "/entityBehaviorsByType/*-normal-*/-",
+    "value": {
+      "name": "translocatordirectionindicator.TranslocatorDirectionVis"
+    }
+  }
+]

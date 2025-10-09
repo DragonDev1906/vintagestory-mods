@@ -1,0 +1,107 @@
+[
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/amaranth",
+    "op": "replace",
+    "path": "/dropsByType/*-9/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/cabbage",
+    "op": "replace",
+    "path": "/dropsByType/*-12/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/carrot",
+    "op": "replace",
+    "path": "/dropsByType/*-7/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/cassava",
+    "op": "replace",
+    "path": "/dropsByType/*-9/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/flax",
+    "op": "replace",
+    "path": "/dropsByType/*-9/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/onion",
+    "op": "replace",
+    "path": "/dropsByType/*-7/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/parsnip",
+    "op": "replace",
+    "path": "/dropsByType/*-8/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/peanut",
+    "op": "replace",
+    "path": "/dropsByType/*-9/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/pineapple",
+    "op": "replace",
+    "path": "/dropsByType/*-16/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/rice",
+    "op": "replace",
+    "path": "/dropsByType/*-10/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/rye",
+    "op": "replace",
+    "path": "/dropsByType/*-9/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/soybean",
+    "op": "replace",
+    "path": "/dropsByType/*-11/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/spelt",
+    "op": "replace",
+    "path": "/dropsByType/*-9/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/sunflower",
+    "op": "replace",
+    "path": "/dropsByType/*-12/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  },
+  {
+    "side": "server",
+    "file": "game:blocktypes/plant/crop/turnip",
+    "op": "replace",
+    "path": "/dropsByType/*-5/0/quantity",
+    "value": { "avg": 1, "var": 0 }
+  }
+]

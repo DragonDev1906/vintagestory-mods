@@ -1,0 +1,13 @@
+{
+    "type": "code",
+    "modid": "translocatordirectionindicator",
+    "name": "Translocator Direction Indicator",
+    "authors": [
+        "Zokora"
+    ],
+    "description": "Adds a small indicator pointing towards the exit Translocator",
+    "version": "1.0.0",
+    "dependencies": {
+        "game": ""
+    }
+}

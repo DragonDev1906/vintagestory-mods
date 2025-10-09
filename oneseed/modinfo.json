@@ -1,0 +1,8 @@
+{
+  "type": "content",
+  "modid": "oneseed",
+  "name": "One Seed",
+  "authors": ["Zokora"],
+  "description": "Reduces seed drops to one per plant (when fully grown)",
+  "version": "1.0.0"
+}
