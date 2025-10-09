@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "modid": "map3d",
+  "name": "Map3D",
+  "authors": ["Zokora"],
+  "description": "Block to display a 3D map of your world",
+  "version": "0.1.0",
+  "dependencies": {
+    "game": ""
+  }
+}
