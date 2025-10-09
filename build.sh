@@ -23,8 +23,12 @@ function info() {
 
 root=$(pwd)
 
+modcount=0
+successcount=0
+
 # Go through all mods we want to build
 for mod in $mods; do
+    ((modcount++))
     if [ ! -f "$mod/modinfo.json" ]; then
         # echo "WARN Skipping mod '$mod' because it doesn't have modinfo.json in the expected location"
         warn "Skipping mod '$mod' because it doesn't have modinfo.json in the expected location"
@@ -72,4 +76,11 @@ for mod in $mods; do
 
     # Reset working directory
     cd "$root"
+
+    ((successcount++))
 done
+
+if [ ! "$successcount" -eq "$modcount" ]; then
+    warn "Could not build $((modcount - successcount))/$modcount mods"
+    exit 1
+fi
