@@ -36,8 +36,8 @@ public class Map3DModSystem : ModSystem
         base.Start(api);
         this.mapChunksY = api.World.BlockAccessor.MapSizeY / 32;
 
-        api.RegisterBlockClass(Mod.Info.ModID + ".blockmapdisplay", typeof(BlockMapDisplay));
-        api.RegisterBlockEntityClass(Mod.Info.ModID + ".mapdisplay", typeof(BlockEntityMapDisplay));
+        api.RegisterBlockClass(Mod.Info.ModID + ".BlockMap", typeof(BlockMap));
+        api.RegisterBlockEntityClass(Mod.Info.ModID + ".Map", typeof(BlockEntityMap));
     }
 
     public override void StartServerSide(ICoreServerAPI api)

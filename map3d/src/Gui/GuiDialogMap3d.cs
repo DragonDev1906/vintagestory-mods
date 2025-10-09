@@ -4,6 +4,8 @@ using Vintagestory.API.MathTools;
 using System;
 using System.Globalization;
 
+#nullable enable
+
 namespace Map3D;
 
 internal class GuiDialogMap3d : GuiDialogGeneric
@@ -14,7 +16,10 @@ internal class GuiDialogMap3d : GuiDialogGeneric
     const float deg2rad = 0.01745329f; // 2pi / 360
     const int offsetSteps = 32; // voxel (based on textures)
 
-    private BlockEntityMapDisplay be;
+    private BlockEntityMap be;
+
+    // Block attributes
+    int maxDistance;
 
     GuiElementDropDown mode;
     GuiElementDropDown lod;
@@ -26,19 +31,19 @@ internal class GuiDialogMap3d : GuiDialogGeneric
 
     GuiElementDynamicText area;
 
-    GuiElementSlider offsetX;
-    GuiElementSlider offsetY;
-    GuiElementSlider offsetZ;
+    GuiElementSlider? offsetX;
+    GuiElementSlider? offsetY;
+    GuiElementSlider? offsetZ;
 
-    GuiElementSlider rotX;
-    GuiElementSlider rotY;
-    GuiElementSlider rotZ;
+    GuiElementSlider? rotX;
+    GuiElementSlider? rotY;
+    GuiElementSlider? rotZ;
 
-    GuiElementSlider scale;
+    GuiElementSlider size;
 
     // Based on GuiDialogSignPost
     // https://github.com/anegostudios/vssurvivalmod/blob/master/Gui/GuiDialogSignPost.cs
-    internal GuiDialogMap3d(string dialogTitle, ICoreClientAPI capi, BlockEntityMapDisplay be)
+    internal GuiDialogMap3d(string dialogTitle, ICoreClientAPI capi, BlockEntityMap be)
         : base(dialogTitle, capi)
     {
         this.be = be;
@@ -161,6 +166,16 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         c.AddDialogTitleBar(dialogTitle, OnTitlebarClose);
         c.BeginChildElements(bgBounds);
 
+        // Block attributes + configuration
+        float catalystEfficiency = be.Block.Attributes?["catalystEfficiency"]?.AsFloat(0.1f) ?? 0.1f;
+        this.maxDistance = be.Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
+        int maxSize = be.Block.Attributes?["maxSize"]?.AsInt(1) ?? 1;
+        bool rotation = be.Block.Attributes?["rotation"]?.AsBool() ?? false;
+        int maxOffset = be.Block.Attributes?["maxOffset"]?.AsInt() ?? 0;
+        float xcenter = be.Block.Attributes?["center"]?["x"]?.AsFloat() ?? 0;
+        float ycenter = be.Block.Attributes?["center"]?["y"]?.AsFloat() ?? 0;
+        float zcenter = be.Block.Attributes?["center"]?["z"]?.AsFloat() ?? 0;
+
         addLabel("Mode");
         mode = new(capi,
             new string[] { "full", "surface" },
@@ -193,52 +208,48 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         c.AddSmallButton(Lang.Get("Update Map data"), OnUpdateMap, bounds(w2, hInput), EnumButtonStyle.Normal);
         y += hInput; // Add some extra space between region and display settings.
 
-        // In the options below we could just send the update to the server and wait for it to update us.
-        // That would however not really be user-friendly, so we try to hide the network latency by
-        // updating our view immediately.
-        addLabel("Offset X");
-        offsetX = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.X - be.Pos.X, (value) =>
+        if (maxOffset > 0)
         {
-            be.dimension.CurrentPos.X = be.Pos.X + value;
-            UpdateServerSide();
-        });
-        addLabel("Offset Y");
-        offsetY = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.Y - be.Pos.Y, (value) =>
-        {
+            addLabel("Offset X");
+            offsetX = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.X - be.Pos.X, (value) =>
+            {
+                UpdateServerSide();
+            });
+            addLabel("Offset Y");
+            offsetY = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.Y - be.Pos.Y, (value) =>
+            {
 
-            be.dimension.CurrentPos.Y = be.Pos.Y + value;
-            UpdateServerSide();
-        });
-        addLabel("Offset Z");
-        offsetZ = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.Z - be.Pos.Z, (value) =>
-        {
-            be.dimension.CurrentPos.Z = be.Pos.Z + value;
-            UpdateServerSide();
-        });
+                UpdateServerSide();
+            });
+            addLabel("Offset Z");
+            offsetZ = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.Z - be.Pos.Z, (value) =>
+            {
+                UpdateServerSide();
+            });
+        }
 
-        addLabel("Yaw");
-        rotX = addSliderFloat(w1, -180, 180, 1, "°", be.dimension.CurrentPos.Yaw / deg2rad, (value) =>
+        if (rotation)
         {
-            be.dimension.CurrentPos.Yaw = value * deg2rad;
-            UpdateServerSide();
-        });
-        addLabel("Pitch");
-        rotY = addSliderFloat(w1, -90, 90, 1, "°", be.dimension.CurrentPos.Pitch / deg2rad, (value) =>
-        {
-            be.dimension.CurrentPos.Pitch = value * deg2rad;
-            UpdateServerSide();
-        });
-        addLabel("Roll");
-        rotZ = addSliderFloat(w1, -180, 180, 1, "°", be.dimension.CurrentPos.Roll / deg2rad, (value) =>
-        {
-            be.dimension.CurrentPos.Roll = value * deg2rad;
-            UpdateServerSide();
-        });
+            addLabel("Yaw");
+            rotX = addSliderFloat(w1, -180, 180, 1, "°", be.dimension.CurrentPos.Yaw / deg2rad, (value) =>
+            {
+                UpdateServerSide();
+            });
+            addLabel("Pitch");
+            rotY = addSliderFloat(w1, -90, 90, 1, "°", be.dimension.CurrentPos.Pitch / deg2rad, (value) =>
+            {
+                UpdateServerSide();
+            });
+            addLabel("Roll");
+            rotZ = addSliderFloat(w1, -180, 180, 1, "°", be.dimension.CurrentPos.Roll / deg2rad, (value) =>
+            {
+                UpdateServerSide();
+            });
+        }
 
-        addLabel("Scale");
-        scale = addSliderFloat(w1, 0.01f, 1, 100, "%", be.scale, (value) =>
+        addLabel("Size");
+        size = addSlider(w1, 1, 32 * maxSize, 1, " voxel", be.size, (value) =>
         {
-            be.dimension.scale = value;
             UpdateServerSide();
         });
 
@@ -254,12 +265,31 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         if (corner1X == null || corner2X == null || corner1Z == null || corner2Z == null)
             return;
 
+        // Convert to relative coordinates
         int x1 = (int)corner1X.GetValue() - (be.Pos.X - coordinateOffset);
         int x2 = (int)corner2X.GetValue() - (be.Pos.X - coordinateOffset);
         int z1 = (int)corner1Z.GetValue() - (be.Pos.Z - coordinateOffset);
         int z2 = (int)corner2Z.GetValue() - (be.Pos.Z - coordinateOffset);
+
+        // Normalize (could also be done before converting to relative coordinates).
+        int xmin = x1 < x2 ? x1 : x2;
+        int xmax = x1 > x2 ? x1 : x2;
+        int zmin = z1 < z2 ? z1 : z2;
+        int zmax = z1 > z2 ? z1 : z2;
+
+        // Calculate validity
+        bool xvalid = xmin >= -this.maxDistance && xmax <= this.maxDistance;
+        bool zvalid = zmin >= -this.maxDistance && zmax <= this.maxDistance;
+        bool valid = this.maxDistance == 0 || (xvalid && zvalid);
+
+        // Build the text to display
         // TODO: Support different languages
-        area.SetNewText("Relative: (" + x1 + ", " + z1 + ") to (" + x2 + ", " + z2 + ")");
+        string text = "Relative: (" + xmin + ", " + zmin + ") to (" + xmax + ", " + zmax + ")";
+        if (!valid)
+            text += "\nINVALID: Max distance = " + this.maxDistance;
+
+        // Set the text
+        area.SetNewText(text);
     }
 
     private void OnTitlebarClose()
@@ -288,13 +318,13 @@ internal class GuiDialogMap3d : GuiDialogGeneric
     }
     private void loadDisplaySettingsFromBE()
     {
-        offsetX.SetValue(be.offset.X);
-        offsetY.SetValue(be.offset.Y);
-        offsetZ.SetValue(be.offset.Z);
-        rotX.SetValue((int)(be.rotation.X / deg2rad));
-        rotY.SetValue((int)(be.rotation.Y / deg2rad));
-        rotZ.SetValue((int)(be.rotation.Z / deg2rad));
-        scale.SetValue((int)(be.scale * 100));
+        offsetX?.SetValue(be.offset.X);
+        offsetY?.SetValue(be.offset.Y);
+        offsetZ?.SetValue(be.offset.Z);
+        rotX?.SetValue((int)(be.rotation.X / deg2rad));
+        rotY?.SetValue((int)(be.rotation.Y / deg2rad));
+        rotZ?.SetValue((int)(be.rotation.Z / deg2rad));
+        size.SetValue(be.size);
     }
 
     private bool OnResetCorners()
@@ -317,11 +347,17 @@ internal class GuiDialogMap3d : GuiDialogGeneric
 
     private void UpdateServerSide()
     {
-        var offset = new Vec3i(offsetX.GetValue(), offsetY.GetValue(), offsetZ.GetValue());
-        var rotation = new Vec3f(rotX.GetValue() * deg2rad, rotY.GetValue() * deg2rad, rotZ.GetValue() * deg2rad);
-        float scale = this.scale.GetValue() / 100f;
+        Vec3i? offset = null;
+        Vec3f? rotation = null;
 
-        ConfigurePacket p = new(offset, rotation, scale);
+        if (offsetX != null && offsetY != null && offsetZ != null)
+            offset = new Vec3i(offsetX.GetValue(), offsetY.GetValue(), offsetZ.GetValue());
+        if (rotX != null && rotY != null && rotZ != null)
+            rotation = new Vec3f(rotX.GetValue() * deg2rad, rotY.GetValue() * deg2rad, rotZ.GetValue() * deg2rad);
+        int size = this.size.GetValue();
+
+        ConfigurePacket p = new(offset, rotation, size);
+        be.ApplyConfigPacket(p);
         capi.Network.SendBlockEntityPacket(be.Pos, (int)MapPacket.Configure, p);
     }
 }

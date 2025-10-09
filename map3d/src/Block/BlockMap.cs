@@ -3,11 +3,11 @@ using Vintagestory.API.Common;
 
 namespace Map3D;
 
-public class BlockMapDisplay : Block
+public class BlockMap : Block
 {
     public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)
     {
-        BlockEntityMapDisplay entity = world.BlockAccessor.GetBlockEntity<BlockEntityMapDisplay>(blockSel.Position);
+        BlockEntityMap entity = world.BlockAccessor.GetBlockEntity<BlockEntityMap>(blockSel.Position);
         if (entity == null)
         {
             api.Logger.Warning("Block Entity no longer exists, please break and replace this block");

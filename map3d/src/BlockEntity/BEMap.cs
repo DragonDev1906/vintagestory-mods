@@ -11,7 +11,7 @@ using System;
 
 namespace Map3D;
 
-internal class BlockEntityMapDisplay : BlockEntity
+internal class BlockEntityMap : BlockEntity
 {
     // Can be null even if we know which dimensionID we need/use.
     internal MapMiniDimension dimension;
@@ -26,7 +26,18 @@ internal class BlockEntityMapDisplay : BlockEntity
     // How and where should it be rendered.
     internal Vec3i offset = Vec3i.Zero; // In voxels (1/32 pixel)
     internal Vec3f rotation = Vec3f.Zero;
-    internal float scale = 0.1f;
+    internal int size = 32; // In voxels
+
+    // Specifying a size is more intuitive than specifying a scale, so that's what
+    // we primarily use. For rendering a scale is way more useful though.
+    internal float scale
+    {
+        get
+        {
+            int dataSize = Math.Max(corner2.X - corner1.X, corner2.Z - corner1.Z);
+            return (float)this.size / (float)dataSize / 32f;
+        }
+    }
 
     private GuiDialogMap3d dlg;
 
@@ -161,7 +172,7 @@ internal class BlockEntityMapDisplay : BlockEntity
         float rotY = tree.GetFloat("rotY", 0);
         float rotZ = tree.GetFloat("rotZ", 0);
         rotation = new(rotX, rotY, rotZ);
-        scale = tree.GetFloat("scale", 0.1f);
+        size = tree.GetInt("size", 32);
 
         // Api.Logger.Notification("FromTreeAttributes: " + oldId + " -> " + dimensionId);
         if (Api is ICoreClientAPI api && oldId != dimId && dimId > 0)
@@ -192,7 +203,7 @@ internal class BlockEntityMapDisplay : BlockEntity
             tree.SetFloat("rotY", rotation.Y);
             tree.SetFloat("rotZ", rotation.Z);
         }
-        tree.SetFloat("scale", scale);
+        tree.SetInt("size", size);
     }
 
     public override void OnReceivedClientPacket(IPlayer fromPlayer, int packetid, byte[] data)
@@ -202,26 +213,60 @@ internal class BlockEntityMapDisplay : BlockEntity
             case (int)MapPacket.UpdateDimension:
                 {
                     UpdateDimensionPacket p = SerializerUtil.Deserialize<UpdateDimensionPacket>(data);
-                    this.mode = p.mode;
-                    this.lod = p.lod;
-                    setCorners(p.corner1, p.corner2);
-                    UpdateDimensionData();
+                    // Check validity on the server-side (not just in the client-side GUI)
+                    if (setCorners(p.corner1, p.corner2))
+                    {
+                        this.mode = p.mode;
+                        this.lod = p.lod;
+                        UpdateDimensionData();
+                    }
+                    else
+                    {
+                        Api.Logger.Warning("Client sent invalid corners");
+                    }
                 }
                 break;
             case (int)MapPacket.Configure:
                 {
                     ConfigurePacket p = SerializerUtil.Deserialize<ConfigurePacket>(data);
-                    offset = p.offset;
-                    rotation = p.rotation;
-                    scale = p.scale;
-                    UpdateDimension();
-                    MarkDirty();
+                    ApplyConfigPacket(p);
                 }
                 break;
             default:
                 base.OnReceivedClientPacket(fromPlayer, packetid, data);
                 break;
         }
+    }
+    // Called server-side when receiving new configuration settings from a client
+    // and client-side when this packet is sent (to hide latency).
+    // It is NOT called for other players that happen to be nearby (that's done
+    // through FromTreeAttributes).
+    internal void ApplyConfigPacket(ConfigurePacket p)
+    {
+        bool allowRotation = Block.Attributes?["rotation"]?.AsBool() ?? false;
+        int maxOffset = Block.Attributes?["maxOffset"]?.AsInt() ?? 0;
+        int maxSize = Block.Attributes?["maxSize"]?.AsInt() ?? 0;
+
+        // Limit the offset
+        offset = ClampVec3iInplace(p.offset, -32 * maxOffset, 32 * maxOffset);
+        // Only apply rotation if it is allowed
+        if (allowRotation)
+            rotation = p.rotation;
+        // Limit the scale (we could calculate the scale from the bounding box size,
+        // but I think this is more flexible and it is the approach I previously had).
+        this.size = Math.Clamp(p.size, 1, 32 * maxSize);
+
+        // Tell the dimension about its new configuration
+        UpdateDimension();
+        MarkDirty();
+    }
+
+    Vec3i ClampVec3iInplace(Vec3i v, int min, int max)
+    {
+        v.X = Math.Clamp(v.X, min, max);
+        v.Y = Math.Clamp(v.Y, min, max);
+        v.Z = Math.Clamp(v.Z, min, max);
+        return v;
     }
     public override void OnReceivedServerPacket(int packetid, byte[] data)
     {
@@ -237,16 +282,25 @@ internal class BlockEntityMapDisplay : BlockEntity
         }
     }
 
-    private void UpdateDimension()
+    internal void UpdateDimension()
     {
         if (dimension != null)
         {
-            dimension.CurrentPos.X = Pos.X + offset.X / 32f;
-            dimension.CurrentPos.Y = Pos.Y + offset.Y / 32f;
-            dimension.CurrentPos.Z = Pos.Z + offset.Z / 32f;
-            dimension.CurrentPos.Yaw = rotation.X;
-            dimension.CurrentPos.Pitch = rotation.Y;
-            dimension.CurrentPos.Roll = rotation.Z;
+            float xcenter = Block.Attributes?["center"]?["x"]?.AsFloat() ?? 0;
+            float ycenter = Block.Attributes?["center"]?["y"]?.AsFloat() ?? 0;
+            float zcenter = Block.Attributes?["center"]?["z"]?.AsFloat() ?? 0;
+
+            bool allowRotation = Block.Attributes?["rotation"]?.AsBool() ?? false;
+
+            dimension.CurrentPos.X = Pos.X + xcenter + offset.X / 32f;
+            dimension.CurrentPos.Y = Pos.Y + ycenter + offset.Y / 32f;
+            dimension.CurrentPos.Z = Pos.Z + zcenter + offset.Z / 32f;
+            if (allowRotation)
+            {
+                dimension.CurrentPos.Yaw = rotation.X;
+                dimension.CurrentPos.Pitch = rotation.Y;
+                dimension.CurrentPos.Roll = rotation.Z;
+            }
             dimension.scale = scale;
         }
     }
@@ -306,8 +360,10 @@ internal class BlockEntityMapDisplay : BlockEntity
         return true;
     }
 
-    private void setCorners(BlockPos corner1, BlockPos corner2)
+    // Returns true if the corners are valid (does nothing if they are not).
+    private bool setCorners(BlockPos corner1, BlockPos corner2)
     {
+        // Normalize corners so the smaller coordinate is always in corner1.
         if (corner1.X > corner2.X)
         {
             int tmp = corner1.X;
@@ -327,8 +383,21 @@ internal class BlockEntityMapDisplay : BlockEntity
             corner2.Z = tmp;
         }
 
-        this.corner1 = corner1;
-        this.corner2 = corner2;
+        // Check on server-side if both corners are within maxDistance.
+        int maxDistance = Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
+        bool valid = maxDistance == 0 || (
+            corner1.X - Pos.X >= -maxDistance && corner2.X - Pos.X <= maxDistance &&
+            corner1.Y >= 0 && corner2.Y <= 256 &&
+            corner1.Z - Pos.Z >= -maxDistance && corner2.Z - Pos.Z <= maxDistance
+        );
+
+        // Only set the corners if they are valid.
+        if (valid)
+        {
+            this.corner1 = corner1;
+            this.corner2 = corner2;
+        }
+        return valid;
     }
 
     // TODO: Don't load all chunks in a single tick, that results in a giant lag spike.
@@ -584,6 +653,7 @@ internal class BlockEntityMapDisplay : BlockEntity
         ));
         dsc.AppendLine("");
         dsc.AppendLine("DimensionId: " + dimId);
+        dsc.AppendLine("Size: " + (size / 32f) + " blocks");
         dsc.AppendLine("Scale: " + scale * 100 + "%");
     }
 }
@@ -629,17 +699,17 @@ internal class UpdateDimensionPacket
 internal class ConfigurePacket
 {
     [ProtoMember(1)]
-    public Vec3i offset;
+    public Vec3i offset; // In voxels
     [ProtoMember(2)]
-    public Vec3f rotation;
+    public Vec3f rotation; // In °
     [ProtoMember(3)]
-    public float scale;
+    public int size; // In voxels
 
     public ConfigurePacket() { }
-    public ConfigurePacket(Vec3i offset, Vec3f rotation, float scale)
+    public ConfigurePacket(Vec3i offset, Vec3f rotation, int size)
     {
         this.offset = offset;
         this.rotation = rotation;
-        this.scale = scale;
+        this.size = size;
     }
 }
