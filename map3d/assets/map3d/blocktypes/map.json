@@ -15,7 +15,18 @@
     },
     {
       "code": "metal",
-      "loadFromProperties": "block/toolmetal"
+      "states": [
+        "copper",
+        "bismuthbronze",
+        "blackbronze",
+        "tinbronze",
+        "brass",
+        "iron",
+        "meteoriciron",
+        "steel",
+        "silver",
+        "gold"
+      ]
     }
   ],
   "attributesByType": {
@@ -127,7 +138,6 @@
       "legs": { "base": "game:block/wood/table/normal/legs" }
     }
   },
-  "blockmaterial": "Wood",
   "sidesolid": {
     "up": true,
     "all": false
