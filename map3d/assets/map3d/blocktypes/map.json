@@ -11,7 +11,7 @@
   "variantGroups": [
     {
       "code": "type",
-      "states": ["projector", "table", "tablewhitemarble"]
+      "states": ["projector", "tablenormal", "tablewhitemarble"]
     },
     {
       "code": "metal",
@@ -89,7 +89,7 @@
   "attributes": {
     "restrictedRotation": {
       "projector": false,
-      "table": true,
+      "tablenormal": true,
       "tablewhitemarble": true
     },
     "center": {
@@ -131,7 +131,7 @@
       "bottom": { "base": "game:block/wood/table/aged/bottom" },
       "legs": { "base": "game:block/wood/table/aged/legs" }
     },
-    "*-table-*": {
+    "*-tablenormal-*": {
       "sides": { "base": "game:block/wood/table/normal/sides" },
       "top": { "base": "game:block/wood/table/normal/top" },
       "bottom": { "base": "game:block/wood/table/normal/bottom" },
