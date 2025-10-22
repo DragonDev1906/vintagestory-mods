@@ -171,6 +171,7 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         this.maxDistance = be.Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
         int maxSize = be.Block.Attributes?["maxSize"]?.AsInt(1) ?? 1;
         bool rotation = be.Block.Attributes?["rotation"]?.AsBool() ?? false;
+        bool restrictedRotation = be.Block.Attributes?["restrictedRotation"]?[be.Block.Variant["type"]]?.AsBool() ?? false;
         int maxOffset = be.Block.Attributes?["maxOffset"]?.AsInt() ?? 0;
         float xcenter = be.Block.Attributes?["center"]?["x"]?.AsFloat() ?? 0;
         float ycenter = be.Block.Attributes?["center"]?["y"]?.AsFloat() ?? 0;
@@ -235,6 +236,9 @@ internal class GuiDialogMap3d : GuiDialogGeneric
             {
                 UpdateServerSide();
             });
+        }
+        if (rotation && !restrictedRotation)
+        {
             addLabel("Pitch");
             rotY = addSliderFloat(w1, -90, 90, 1, "°", be.dimension.CurrentPos.Pitch / deg2rad, (value) =>
             {
@@ -352,8 +356,12 @@ internal class GuiDialogMap3d : GuiDialogGeneric
 
         if (offsetX != null && offsetY != null && offsetZ != null)
             offset = new Vec3i(offsetX.GetValue(), offsetY.GetValue(), offsetZ.GetValue());
-        if (rotX != null && rotY != null && rotZ != null)
-            rotation = new Vec3f(rotX.GetValue() * deg2rad, rotY.GetValue() * deg2rad, rotZ.GetValue() * deg2rad);
+        if (rotX != null || rotY != null || rotZ != null)
+            rotation = new Vec3f(
+                rotX?.GetValue() ?? 0 * deg2rad,
+                rotY?.GetValue() ?? 0 * deg2rad,
+                rotZ?.GetValue() ?? 0 * deg2rad
+            );
         int size = this.size.GetValue();
 
         ConfigurePacket p = new(offset, rotation, size);

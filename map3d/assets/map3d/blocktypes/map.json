@@ -4,20 +4,14 @@
   "class": "map3d.BlockMap",
   "entityClass": "map3d.Map",
   "creativeinventory": {
-    "general": [
-      "*"
-    ],
-    "map3d": [
-      "*"
-    ]
+    "general": ["*"],
+    "map3d": ["*"]
   },
   "blockMaterial": "metal",
   "variantGroups": [
     {
       "code": "type",
-      "states": [
-        "projector"
-      ]
+      "states": ["projector", "table", "tablewhitemarble"]
     },
     {
       "code": "metal",
@@ -27,44 +21,51 @@
   "attributesByType": {
     "*-*-copper": {
       "catalystEfficiency": 0.1,
-      "maxSize": 2,
+      "maxSize": 1,
       "maxDistance": 500,
+      "maxOffset": 0,
       "rotation": false
     },
     "*-*-*bronze": {
       "catalystEfficiency": 0.2,
       "maxSize": 4,
       "maxDistance": 1000,
+      "maxOffset": 2,
       "rotation": false
     },
     "*-*-brass": {
       "catalystEfficiency": 0.25,
       "maxDistance": 1000,
       "maxSize": 4,
+      "maxOffset": 2,
       "rotation": false
     },
     "*-*-*iron": {
       "catalystEfficiency": 0.5,
       "maxDistance": 5000,
       "maxSize": 8,
+      "maxOffset": 4,
       "rotation": true
     },
     "*-*-steel": {
       "catalystEfficiency": 0.75,
       "maxDistance": 10000,
       "maxSize": 16,
+      "maxOffset": 5,
       "rotation": true
     },
     "*-*-silver": {
       "catalystEfficiency": 1,
       "maxDistance": 0,
       "maxSize": 32,
+      "maxOffset": 5,
       "rotation": true
     },
     "*-*-gold": {
       "catalystEfficiency": 1,
       "maxDistance": 0,
       "maxSize": 64,
+      "maxOffset": 5,
       "rotation": true
     },
     "*-*-*": {
@@ -75,11 +76,80 @@
     }
   },
   "attributes": {
+    "restrictedRotation": {
+      "projector": false,
+      "table": true,
+      "tablewhitemarble": true
+    },
     "center": {
       "x": 0.5,
       "y": 1,
       "z": 0.5
+    }
+  },
+  "shapeByType": {
+    "*-table*-*": {
+      "base": "game:block/wood/table"
     },
-    "maxOffset": 5
+    "*-projector-*": {
+      "base": "game:block/devastation/machinery/miscmedium2"
+    }
+  },
+  "texturesByType": {
+    "*-tablewhitemarble-*": {
+      "sides": { "base": "game:block/wood/table/normal/sides-whitemarble" },
+      "top": { "base": "game:block/stone/polishedrock/whitemarble-inside" },
+      "bottom": { "base": "game:block/wood/table/normal/bottom" },
+      "legs": { "base": "game:block/wood/table/normal/legs" }
+    },
+    "*-tableredmarble-*": {
+      "sides": { "base": "game:block/wood/table/normal/sides-redmarble" },
+      "top": { "base": "game:block/stone/polishedrock/redmarble-inside" },
+      "bottom": { "base": "game:block/wood/table/normal/bottom" },
+      "legs": { "base": "game:block/wood/table/normal/legs" }
+    },
+    "*-tablegreenmarble-*": {
+      "sides": { "base": "game:block/wood/table/normal/sides-greenmarble" },
+      "top": { "base": "game:block/stone/polishedrock/greenmarble-inside" },
+      "bottom": { "base": "game:block/wood/table/normal/bottom" },
+      "legs": { "base": "game:block/wood/table/normal/legs" }
+    },
+    "*-tableaged-*": {
+      "sides": { "base": "game:block/wood/table/aged/sides" },
+      "top": { "base": "game:block/wood/table/aged/top" },
+      "bottom": { "base": "game:block/wood/table/aged/bottom" },
+      "legs": { "base": "game:block/wood/table/aged/legs" }
+    },
+    "*-table-*": {
+      "sides": { "base": "game:block/wood/table/normal/sides" },
+      "top": { "base": "game:block/wood/table/normal/top" },
+      "bottom": { "base": "game:block/wood/table/normal/bottom" },
+      "legs": { "base": "game:block/wood/table/normal/legs" }
+    }
+  },
+  "blockmaterial": "Wood",
+  "sidesolid": {
+    "up": true,
+    "all": false
+  },
+  "sideopaque": {
+    "up": true,
+    "all": false
+  },
+  "sounds": {
+    "place": "game:block/planks",
+    "hit": "game:block/planks",
+    "break": "game:block/planks",
+    "walk": "game:walk/wood"
+  },
+  "heldTpIdleAnimation": "holdunderarm",
+  "tpHandTransform": {
+    "translation": { "x": -0.7, "y": -0.6, "z": -0.9 },
+    "rotation": { "x": 80, "y": 0, "z": 0 },
+    "scale": 0.56
+  },
+  "fpHandTransform": {
+    "translation": { "x": 0.08, "y": -0.2, "z": 0.6 },
+    "rotation": { "x": 33, "y": 134, "z": -102 }
   }
 }

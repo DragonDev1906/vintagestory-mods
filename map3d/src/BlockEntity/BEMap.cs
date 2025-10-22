@@ -244,14 +244,25 @@ internal class BlockEntityMap : BlockEntity
     internal void ApplyConfigPacket(ConfigurePacket p)
     {
         bool allowRotation = Block.Attributes?["rotation"]?.AsBool() ?? false;
+        bool restrictedRotation = Block.Attributes?["restrictedRotation"]?[Block.Variant["type"]]?.AsBool() ?? false;
         int maxOffset = Block.Attributes?["maxOffset"]?.AsInt() ?? 0;
         int maxSize = Block.Attributes?["maxSize"]?.AsInt() ?? 0;
 
         // Limit the offset
-        offset = ClampVec3iInplace(p.offset, -32 * maxOffset, 32 * maxOffset);
+        if (p.offset != null)
+        {
+            offset = ClampVec3iInplace(p.offset, -32 * maxOffset, 32 * maxOffset);
+        }
         // Only apply rotation if it is allowed
+        if (allowRotation && restrictedRotation)
+        {
+            rotation.Y = 0;
+            rotation.Z = 0;
+        }
         if (allowRotation)
+        {
             rotation = p.rotation;
+        }
         // Limit the scale (we could calculate the scale from the bounding box size,
         // but I think this is more flexible and it is the approach I previously had).
         this.size = Math.Clamp(p.size, 1, 32 * maxSize);
@@ -291,15 +302,19 @@ internal class BlockEntityMap : BlockEntity
             float zcenter = Block.Attributes?["center"]?["z"]?.AsFloat() ?? 0;
 
             bool allowRotation = Block.Attributes?["rotation"]?.AsBool() ?? false;
+            bool restrictedRotation = Block.Attributes?["restrictedRotation"]?[Block.Variant["type"]]?.AsBool() ?? false;
 
             dimension.CurrentPos.X = Pos.X + xcenter + offset.X / 32f;
             dimension.CurrentPos.Y = Pos.Y + ycenter + offset.Y / 32f;
             dimension.CurrentPos.Z = Pos.Z + zcenter + offset.Z / 32f;
-            if (allowRotation)
+            if (allowRotation && rotation != null)
             {
                 dimension.CurrentPos.Yaw = rotation.X;
-                dimension.CurrentPos.Pitch = rotation.Y;
-                dimension.CurrentPos.Roll = rotation.Z;
+                if (!restrictedRotation)
+                {
+                    dimension.CurrentPos.Pitch = rotation.Y;
+                    dimension.CurrentPos.Roll = rotation.Z;
+                }
             }
             dimension.scale = scale;
         }
