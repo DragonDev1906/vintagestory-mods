@@ -5,7 +5,7 @@
   "entityClass": "map3d.Map",
   "creativeinventory": {
     "general": ["*"],
-    "map3d": ["*"]
+    "dim": ["*"]
   },
   "blockMaterial": "metal",
   "variantGroups": [
