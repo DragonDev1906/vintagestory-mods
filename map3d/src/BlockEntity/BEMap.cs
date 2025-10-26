@@ -23,6 +23,8 @@ internal class BlockEntityMap : BlockEntity
     internal BlockPos center;
     internal Vec3i srcSize;
 
+    private Map3DModSystem system;
+
     private double distanceSq
     {
         get
@@ -60,14 +62,14 @@ internal class BlockEntityMap : BlockEntity
 
     private void CreateDimensionClientSide(ICoreClientAPI api)
     {
-        api.Logger.Notification("Dimension: " + api.World.MiniDimensions.TryGetValue(dimId) + ".");
+        system.Mod.Logger.Notification("Dimension: " + api.World.MiniDimensions.TryGetValue(dimId) + ".");
         dimension = new MapMiniDimension((BlockAccessorBase)api.World.BlockAccessor, Pos.ToVec3d(), api, scale);
         api.World.MiniDimensions[dimId] = dimension; // Usually done by GetOrCreateDimension
         dimension.SetSubDimensionId(dimId);
         dimension.CurrentPos = new(Pos.X, Pos.Y, Pos.Z);
         // We need to set this, otherwise Render will just ignore this dimension.
         dimension.selectionTrackingOriginalPos = Pos;
-        api.Logger.Notification("Dimension created on client-side: " + dimId.ToString() + " : " + Pos.ToVec3d().ToString());
+        system.Mod.Logger.Notification("Dimension created on client-side: " + dimId.ToString() + " : " + Pos.ToVec3d().ToString());
         UpdateDimension();
     }
 
@@ -82,6 +84,7 @@ internal class BlockEntityMap : BlockEntity
     public override void Initialize(ICoreAPI api)
     {
         base.Initialize(api);
+        system = Api.ModLoader.GetModSystem<Map3DModSystem>();
 
         // Avoid the risk of recursion.
         if (Pos.dimension != 0)
@@ -95,7 +98,7 @@ internal class BlockEntityMap : BlockEntity
         if (srcSize == null)
             srcSize = new Vec3i(201, 256, 201);
 
-        api.Logger.Notification("Initialize: " + dimId);
+        system.Mod.Logger.Notification("Initialize: " + dimId);
         // Create the dimension when this BE is loaded, thus it should
         // work for other players that have not interacted with the MapDisplay.
         if (api is ICoreClientAPI capi && dimId > 0)
@@ -125,14 +128,14 @@ internal class BlockEntityMap : BlockEntity
             // dimension = sapi.World.BlockAccessor.CreateMiniDimension(Pos.ToVec3d());
             int id = sapi.Server.SetMiniDimension(dimension, dimId);
             dimension.SetSubDimensionId(dimId);
-            api.Logger.Notification("SetMiniDimension: " + dimId + ":" + id);
+            system.Mod.Logger.Notification("SetMiniDimension: " + dimId + ":" + id);
         }
     }
 
     public override void OnBlockRemoved()
     {
         if (dimension != null)
-            Api.ModLoader.GetModSystem<Map3DModSystem>().FreeMiniDimension(dimension);
+            system.FreeMiniDimension(dimension);
         // Probably not neccessarily to reset these, but it won't hurt.
         dimension = null;
         dimId = 0;
@@ -163,13 +166,13 @@ internal class BlockEntityMap : BlockEntity
 
             if (Api is ICoreClientAPI capi)
             {
-                Api.Logger.Notification("Unloading dimension {0}", dimId);
+                system.Mod.Logger.Notification("Unloading dimension {0}", dimId);
                 // This stops rendering the mini dimension. Not sure if it deletes the chunk data.
                 capi.World.MiniDimensions.Remove(dimId);
                 dimension = null;
             }
             else
-                Api.Logger.Notification("Would love to unload dimension on server side {0}", dimId);
+                system.Mod.Logger.Notification("Would love to unload dimension on server side {0}", dimId);
         }
         base.OnBlockUnloaded();
     }
@@ -191,7 +194,6 @@ internal class BlockEntityMap : BlockEntity
         rotation = new(rotX, rotY, rotZ);
         size = tree.GetInt("size", 32);
 
-        // Api.Logger.Notification("FromTreeAttributes: " + oldId + " -> " + dimensionId);
         if (Api is ICoreClientAPI api && oldId != dimId && dimId > 0)
         {
             CreateDimensionClientSide(api);
@@ -236,7 +238,7 @@ internal class BlockEntityMap : BlockEntity
                     long dz = Pos.Z - p.center.Z;
                     if (dx * dx + dz * dz > maxDistance * maxDistance)
                     {
-                        Api.Logger.Warning("Client sent invalid UpdateDimensionPacket");
+                        system.Mod.Logger.Warning("Client sent invalid UpdateDimensionPacket");
                         return;
                     }
 
@@ -345,7 +347,7 @@ internal class BlockEntityMap : BlockEntity
     {
         if (Api is ICoreClientAPI capi)
         {
-            capi.Logger.Notification("Dimension count: " + capi.World.MiniDimensions.Count);
+            system.Mod.Logger.Notification("Dimension count: " + capi.World.MiniDimensions.Count);
             // CreateDimensionClientSide(capi);
 
             // This will probably fail because we currently don't set the dimension.
@@ -383,7 +385,7 @@ internal class BlockEntityMap : BlockEntity
                 dimension = new MapMiniDimension((BlockAccessorBase)sapi.World.BlockAccessor, Pos.ToVec3d(), Api, scale);
                 int id = sapi.Server.SetMiniDimension(dimension, dimId);
                 dimension.SetSubDimensionId(dimId);
-                Api.Logger.Notification("SetMiniDimension: " + dimId + ":" + id);
+                system.Mod.Logger.Notification("SetMiniDimension: " + dimId + ":" + id);
 
             }
 
@@ -422,7 +424,7 @@ internal class BlockEntityMap : BlockEntity
             sx = (sx + 31) / 32;
             sz = (sz + 31) / 32;
 
-            sapi.Logger.Notification("Loading map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
+            system.Mod.Logger.Notification("Loading map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
 
 
 
@@ -432,7 +434,7 @@ internal class BlockEntityMap : BlockEntity
                 sx, 8, sz,
                 Lod.None
             );
-            sapi.ModLoader.GetModSystem<Map3DModSystem>().LoadChunksV2(req);
+            system.LoadChunksV2(req);
 
 
 
@@ -455,7 +457,7 @@ internal class BlockEntityMap : BlockEntity
     // Should be called server-side.
     public void UpdateDimensionData()
     {
-        Api.Logger.Notification("Update Dimension Data");
+        system.Mod.Logger.Notification("Update Dimension Data");
 
         dimension.ClearChunks();
         if (Api is ICoreServerAPI sapi)
@@ -476,7 +478,7 @@ internal class BlockEntityMap : BlockEntity
         }
 
         watch.Stop();
-        Api.Logger.Notification("UpdateDimensionData with mode {0} finished in {1} ms", mode, watch.ElapsedMilliseconds);
+        system.Mod.Logger.Notification("UpdateDimensionData with mode {0} finished in {1} ms", mode, watch.ElapsedMilliseconds);
 
         MarkDirty();
     }
@@ -505,7 +507,7 @@ internal class BlockEntityMap : BlockEntity
         sx = (sx + 31) / 32;
         sz = (sz + 31) / 32;
 
-        Api.Logger.Notification("Copying map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
+        system.Mod.Logger.Notification("Copying map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
 
         int cornerX = (center.X - srcSize.X / 2);
         int cornerZ = (center.Z - srcSize.Z / 2);
@@ -517,7 +519,7 @@ internal class BlockEntityMap : BlockEntity
             cxstart, 1024, czstart,
             lod, RequestType.Copy
         );
-        Api.ModLoader.GetModSystem<Map3DModSystem>().LoadChunksV2(req);
+        system.LoadChunksV2(req);
     }
 
     // private void copyToDimension()

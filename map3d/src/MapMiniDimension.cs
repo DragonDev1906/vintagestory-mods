@@ -9,7 +9,7 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
 {
     // TODO: Remove api
     ICoreAPI api;
-    Map3DModSystem modSystem;
+    Map3DModSystem system;
     public float scale { get; set; }
 
     // See https://github.com/bluelightning32/vs-dimensions-demo/blob/main/src/AnchoredDimension.cs
@@ -18,7 +18,7 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
     {
         this.scale = scale;
         this.api = api;
-        this.modSystem = api.ModLoader.GetModSystem<Map3DModSystem>();
+        this.system = api.ModLoader.GetModSystem<Map3DModSystem>();
     }
 
     public override void AdjustPosForSubDimension(BlockPos pos)
@@ -112,7 +112,7 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
             ((long)(cy) << 42) // Includes the dimension
         );
 
-        modSystem.AddChunkToLoadedList(cindex, chunk);
+        system.AddChunkToLoadedList(cindex, chunk);
         AddLoadedChunk(new Vec3i(cx, cy, cz), chunk);
     }
 
@@ -180,7 +180,7 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
                     ret = chunk;
             }
             if (ret == null)
-                api.Logger.Error("Could not find chunk at y={0} (idx={1}) after generating {2} chunks", posY, idx, chunkMapSizeY);
+                system.Mod.Logger.Error("Could not find chunk at y={0} (idx={1}) after generating {2} chunks", posY, idx, chunkMapSizeY);
             return ret;
         }
         else

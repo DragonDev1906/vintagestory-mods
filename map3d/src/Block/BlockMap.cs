@@ -13,7 +13,7 @@ public class BlockMap : Block
         BlockEntityMap entity = world.BlockAccessor.GetBlockEntity<BlockEntityMap>(blockSel.Position);
         if (entity == null)
         {
-            api.Logger.Warning("Block Entity no longer exists, please break and replace this block");
+            api.ModLoader.GetModSystem<Map3DModSystem>().Mod.Logger.Warning("Block Entity no longer exists, please break and replace this block");
             if (api.Side == EnumAppSide.Client)
                 ((IClientPlayer)byPlayer).ShowChatNotification("Block Entity no longer exists, please break and replace this block");
             return false;

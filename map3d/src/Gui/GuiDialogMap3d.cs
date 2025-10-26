@@ -295,7 +295,6 @@ internal class GuiDialogMap3d : GuiDialogGeneric
     // hopefully without falling into infinite recursion.
     public void LoadFromBE()
     {
-        capi.Logger.Notification("Update from BE");
         loadDataSettingsFromBE();
         loadDisplaySettingsFromBE();
     }
