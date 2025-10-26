@@ -4,22 +4,27 @@ using Vintagestory.API.Datastructures;
 
 using Vintagestory.GameContent;
 
-namespace TranslocatorDirectionIndicator {
+namespace TranslocatorDirectionIndicator
+{
     // This logic should probably be on the BlockEntity, but that causes
     // compatibility issues with other mods.
-    internal class BEBehaviorTranslocatorDirectionVis : BlockEntityBehavior {
+    internal class BEBehaviorTranslocatorDirectionVis : BlockEntityBehavior
+    {
         public SimpleParticleProperties directionParticles;
 
-        public BlockEntityStaticTranslocator Translocator {
-            get {
+        public BlockEntityStaticTranslocator Translocator
+        {
+            get
+            {
                 return ((BlockEntityStaticTranslocator)Blockentity);
             }
         }
 
         // Constructor
-        public BEBehaviorTranslocatorDirectionVis(BlockEntity blockentity): base(blockentity) { }
+        public BEBehaviorTranslocatorDirectionVis(BlockEntity blockentity) : base(blockentity) { }
 
-        public override void Initialize(ICoreAPI api, JsonObject properties) {
+        public override void Initialize(ICoreAPI api, JsonObject properties)
+        {
             base.Initialize(api, properties);
 
             // I still have no clue why the base game stores this in the Block
@@ -29,21 +34,23 @@ namespace TranslocatorDirectionIndicator {
             directionParticles = new SimpleParticleProperties(
                 0.5f, 1, // Min/Max quantity
                 ColorUtil.ToRgba(0, 0, 255, 128),
-                new Vec3d(),new Vec3d(), // Min/max position
-                new Vec3f(0.1f, -0.1f, 0),new Vec3f(0.1f, 0.1f, 0), // Min/Max velocity
+                new Vec3d(), new Vec3d(), // Min/max position
+                new Vec3f(0.1f, -0.1f, 0), new Vec3f(0.1f, 0.1f, 0), // Min/Max velocity
                 1.5f, 0, // lifeLength, gravity
                 0.1f, 1f, // Min/Max size
                 EnumParticleModel.Quad
             );
 
-            if (api.World.Side == EnumAppSide.Client) {
-                api.Logger.Event("BEBehaviorTranslocatorDirectionVis initialized (Client)");
+            if (api.World.Side == EnumAppSide.Client)
+            {
                 Translocator.RegisterGameTickListener(OnClientGameTick, 50);
             }
         }
 
-        private void OnClientGameTick(float dt) {
-            if (Translocator.tpLocation == null) {
+        private void OnClientGameTick(float dt)
+        {
+            if (Translocator.tpLocation == null)
+            {
                 return;
             }
 
@@ -80,7 +87,8 @@ namespace TranslocatorDirectionIndicator {
             Api.World.SpawnParticles(directionParticles);
         }
 
-        static float mapRange(float value, float fromMin, float fromMax, float toMin, float toMax) {
+        static float mapRange(float value, float fromMin, float fromMax, float toMin, float toMax)
+        {
             return toMin + (value - fromMin) * (toMax - toMin) / (fromMax - fromMin);
         }
     }
