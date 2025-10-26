@@ -24,10 +24,10 @@ internal class GuiDialogMap3d : GuiDialogGeneric
     GuiElementDropDown mode;
     GuiElementDropDown lod;
 
-    GuiElementNumberInput corner1X;
-    GuiElementNumberInput corner1Z;
-    GuiElementNumberInput corner2X;
-    GuiElementNumberInput corner2Z;
+    GuiElementNumberInput centerX;
+    GuiElementNumberInput centerZ;
+    GuiElementNumberInput sizeX;
+    GuiElementNumberInput sizeZ;
 
     GuiElementDynamicText area;
 
@@ -193,13 +193,13 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         );
         c.AddInteractiveElement(lod);
 
-        addLabel("Corner 1");
-        corner1X = addInt(w2, be.corner1.X - coordinateOffset, (_) => UpdateAreaText());
-        corner1Z = addInt(w2, be.corner1.Z - coordinateOffset, (_) => UpdateAreaText());
+        addLabel("Center");
+        centerX = addInt(w2, be.center.X - coordinateOffset, (_) => UpdateAreaText());
+        centerZ = addInt(w2, be.center.Z - coordinateOffset, (_) => UpdateAreaText());
 
-        addLabel("Corner 2");
-        corner2X = addInt(w2, be.corner2.X - coordinateOffset, (_) => UpdateAreaText());
-        corner2Z = addInt(w2, be.corner2.Z - coordinateOffset, (_) => UpdateAreaText());
+        addLabel("Size");
+        sizeX = addInt(w2, be.srcSize.X, (_) => UpdateAreaText());
+        sizeZ = addInt(w2, be.srcSize.Z, (_) => UpdateAreaText());
 
         newline();
         area = new(capi, "", CairoFont.WhiteSmallText(), bounds(w1, 2 * hLabel));
@@ -266,31 +266,20 @@ internal class GuiDialogMap3d : GuiDialogGeneric
 
     private void UpdateAreaText()
     {
-        if (corner1X == null || corner2X == null || corner1Z == null || corner2Z == null)
+        if (centerX == null || centerZ == null || sizeX == null || sizeZ == null)
             return;
 
         // Convert to relative coordinates
-        int x1 = (int)corner1X.GetValue() - (be.Pos.X - coordinateOffset);
-        int x2 = (int)corner2X.GetValue() - (be.Pos.X - coordinateOffset);
-        int z1 = (int)corner1Z.GetValue() - (be.Pos.Z - coordinateOffset);
-        int z2 = (int)corner2Z.GetValue() - (be.Pos.Z - coordinateOffset);
-
-        // Normalize (could also be done before converting to relative coordinates).
-        int xmin = x1 < x2 ? x1 : x2;
-        int xmax = x1 > x2 ? x1 : x2;
-        int zmin = z1 < z2 ? z1 : z2;
-        int zmax = z1 > z2 ? z1 : z2;
-
-        // Calculate validity
-        bool xvalid = xmin >= -this.maxDistance && xmax <= this.maxDistance;
-        bool zvalid = zmin >= -this.maxDistance && zmax <= this.maxDistance;
-        bool valid = this.maxDistance == 0 || (xvalid && zvalid);
+        int x = (int)centerX.GetValue() - (be.Pos.X - coordinateOffset);
+        int z = (int)centerZ.GetValue() - (be.Pos.Z - coordinateOffset);
+        long distanceSq = (long)x * x + (long)z * z;
 
         // Build the text to display
         // TODO: Support different languages
-        string text = "Relative: (" + xmin + ", " + zmin + ") to (" + xmax + ", " + zmax + ")";
-        if (!valid)
+        string text = "Relative: (" + x + ", " + z + ")\nDistance: " + MathF.Sqrt(distanceSq);
+        if (distanceSq > this.maxDistance * this.maxDistance)
             text += "\nINVALID: Max distance = " + this.maxDistance;
+
 
         // Set the text
         area.SetNewText(text);
@@ -314,10 +303,10 @@ internal class GuiDialogMap3d : GuiDialogGeneric
     {
         mode.SetSelectedIndex((int)be.mode);
         lod.SetSelectedIndex((int)be.lod);
-        corner1X.SetValue(be.corner1.X - coordinateOffset);
-        corner1Z.SetValue(be.corner1.Z - coordinateOffset);
-        corner2X.SetValue(be.corner2.X - coordinateOffset);
-        corner2Z.SetValue(be.corner2.Z - coordinateOffset);
+        centerX.SetValue(be.center.X - coordinateOffset);
+        centerZ.SetValue(be.center.Z - coordinateOffset);
+        sizeX.SetValue(be.srcSize.X);
+        sizeZ.SetValue(be.srcSize.Z);
         UpdateAreaText();
     }
     private void loadDisplaySettingsFromBE()
@@ -339,12 +328,18 @@ internal class GuiDialogMap3d : GuiDialogGeneric
 
     private bool OnUpdateMap()
     {
-        var corner1 = new BlockPos((int)corner1X.GetValue() + coordinateOffset, 0, (int)corner1Z.GetValue() + coordinateOffset);
-        var corner2 = new BlockPos((int)corner2X.GetValue() + coordinateOffset, 256, (int)corner2Z.GetValue() + coordinateOffset);
+        int sx = (int)sizeX.GetValue();
+        int sz = (int)sizeZ.GetValue();
+        var center = new BlockPos(
+            (int)centerX.GetValue() + coordinateOffset,
+            0,
+            (int)centerZ.GetValue() + coordinateOffset
+        );
+        var size = new Vec3i(sx, 256, sz);
         var mode = (MapMode)this.mode.SelectedIndices[0];
         var lod = (Lod)this.lod.SelectedIndices[0];
 
-        UpdateDimensionPacket p = new(mode, corner1, corner2, lod);
+        UpdateDimensionPacket p = new(mode, center, size, lod);
         capi.Network.SendBlockEntityPacket(be.Pos, (int)MapPacket.UpdateDimension, p);
         return true;
     }

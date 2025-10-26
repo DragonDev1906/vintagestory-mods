@@ -20,8 +20,25 @@ internal class BlockEntityMap : BlockEntity
     private int dimId;
     internal MapMode mode;
     internal Lod lod;
-    internal BlockPos corner1;
-    internal BlockPos corner2;
+    internal BlockPos center;
+    internal Vec3i srcSize;
+
+    private double distanceSq
+    {
+        get
+        {
+            int dx = Pos.X - center.X;
+            int dz = Pos.Z - center.Z;
+            return dx * dx + dz * dz;
+        }
+    }
+    private double distance
+    {
+        get
+        {
+            return Math.Sqrt(distanceSq);
+        }
+    }
 
     // How and where should it be rendered.
     internal Vec3i offset = Vec3i.Zero; // In voxels (1/32 pixel)
@@ -34,7 +51,7 @@ internal class BlockEntityMap : BlockEntity
     {
         get
         {
-            int dataSize = Math.Max(corner2.X - corner1.X, corner2.Z - corner1.Z);
+            int dataSize = Math.Max(srcSize.X, srcSize.Z);
             return (float)this.size / (float)dataSize / 32f;
         }
     }
@@ -73,10 +90,10 @@ internal class BlockEntityMap : BlockEntity
         }
 
         // These can differ from the current position, but these are some sane defaults.
-        if (corner1 == null)
-            corner1 = Pos.AddCopy(-100, 0, -100);
-        if (corner2 == null)
-            corner2 = Pos.AddCopy(100, 0, 100);
+        if (center == null)
+            center = Pos;
+        if (srcSize == null)
+            srcSize = new Vec3i(201, 256, 201);
 
         api.Logger.Notification("Initialize: " + dimId);
         // Create the dimension when this BE is loaded, thus it should
@@ -165,8 +182,8 @@ internal class BlockEntityMap : BlockEntity
         dimId = tree.GetAsInt("dimensionId");
         mode = (MapMode)tree.GetInt("mode");
         lod = (Lod)tree.GetInt("lod");
-        corner1 = tree.GetBlockPos("corner1");
-        corner2 = tree.GetBlockPos("corner2");
+        center = tree.GetBlockPos("center");
+        srcSize = tree.GetVec3i("srcSize");
         offset = tree.GetVec3i("offset", Vec3i.Zero);
         float rotX = tree.GetFloat("rotX", 0);
         float rotY = tree.GetFloat("rotY", 0);
@@ -191,10 +208,10 @@ internal class BlockEntityMap : BlockEntity
         tree.SetInt("dimensionId", dimId);
         tree.SetInt("mode", (int)mode);
         tree.SetInt("lod", (int)lod);
-        if (corner1 != null)
-            tree.SetBlockPos("corner1", corner1);
-        if (corner2 != null)
-            tree.SetBlockPos("corner2", corner2);
+        if (center != null)
+            tree.SetBlockPos("center", center);
+        if (srcSize != null)
+            tree.SetVec3i("srcSize", srcSize);
         if (offset != null)
             tree.SetVec3i("offset", offset);
         if (rotation != null)
@@ -214,18 +231,22 @@ internal class BlockEntityMap : BlockEntity
                 {
                     UpdateDimensionPacket p = SerializerUtil.Deserialize<UpdateDimensionPacket>(data);
                     // Check validity on the server-side (not just in the client-side GUI)
-                    if (setCorners(p.corner1, p.corner2))
+                    int maxDistance = Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
+                    long dx = Pos.X - p.center.X;
+                    long dz = Pos.Z - p.center.Z;
+                    if (dx * dx + dz * dz > maxDistance * maxDistance)
                     {
-                        this.mode = p.mode;
-                        this.lod = p.lod;
-                        UpdateDimensionData();
+                        Api.Logger.Warning("Client sent invalid UpdateDimensionPacket");
+                        return;
                     }
-                    else
-                    {
-                        Api.Logger.Warning("Client sent invalid corners");
-                    }
+
+                    this.center = p.center;
+                    this.srcSize = p.size;
+                    this.mode = p.mode;
+                    this.lod = p.lod;
+                    UpdateDimensionData();
+                    break;
                 }
-                break;
             case (int)MapPacket.Configure:
                 {
                     ConfigurePacket p = SerializerUtil.Deserialize<ConfigurePacket>(data);
@@ -375,46 +396,6 @@ internal class BlockEntityMap : BlockEntity
         return true;
     }
 
-    // Returns true if the corners are valid (does nothing if they are not).
-    private bool setCorners(BlockPos corner1, BlockPos corner2)
-    {
-        // Normalize corners so the smaller coordinate is always in corner1.
-        if (corner1.X > corner2.X)
-        {
-            int tmp = corner1.X;
-            corner1.X = corner2.X;
-            corner2.X = tmp;
-        }
-        if (corner1.Y > corner2.Y)
-        {
-            int tmp = corner1.Y;
-            corner1.Y = corner2.Y;
-            corner2.Y = tmp;
-        }
-        if (corner1.Z > corner2.Z)
-        {
-            int tmp = corner1.Z;
-            corner1.Z = corner2.Z;
-            corner2.Z = tmp;
-        }
-
-        // Check on server-side if both corners are within maxDistance.
-        int maxDistance = Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
-        bool valid = maxDistance == 0 || (
-            corner1.X - Pos.X >= -maxDistance && corner2.X - Pos.X <= maxDistance &&
-            corner1.Y >= 0 && corner2.Y <= 256 &&
-            corner1.Z - Pos.Z >= -maxDistance && corner2.Z - Pos.Z <= maxDistance
-        );
-
-        // Only set the corners if they are valid.
-        if (valid)
-        {
-            this.corner1 = corner1;
-            this.corner2 = corner2;
-        }
-        return valid;
-    }
-
     // TODO: Don't load all chunks in a single tick, that results in a giant lag spike.
     private void LoadChunks()
     {
@@ -423,8 +404,8 @@ internal class BlockEntityMap : BlockEntity
             // TODO: Make sure the following gets updated to the new chunk aligned copying.
 
             // This is what our sub dimension coordinates are based on.
-            int sx = corner2.X - corner1.X + 1;
-            int sz = corner2.Z - corner1.Z + 1;
+            int sx = srcSize.X;
+            int sz = srcSize.Z;
 
             // Start with the center of the subdimension, see AdjustPosForSubDimension which
             // does this calculation with block coordinates instead of chunk coordinates.
@@ -503,8 +484,8 @@ internal class BlockEntityMap : BlockEntity
     private void copyToDimensionV2()
     {
         // This is what our sub dimension coordinates are based on.
-        int sx = corner2.X - corner1.X + 1;
-        int sz = corner2.Z - corner1.Z + 1;
+        int sx = srcSize.X;
+        int sz = srcSize.Z;
 
         // Start with the center of the subdimension, see AdjustPosForSubDimension which
         // does this calculation with block coordinates instead of chunk coordinates.
@@ -526,9 +507,12 @@ internal class BlockEntityMap : BlockEntity
 
         Api.Logger.Notification("Copying map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
 
+        int cornerX = (center.X - srcSize.X / 2);
+        int cornerZ = (center.Z - srcSize.Z / 2);
+
         var req = new ChunkRequest(
             dimension.OnChunkLoaded,
-            corner1.X / 32, corner1.Y / 32, corner1.Z / 32,
+            cornerX / 32, 0, cornerZ / 32,
             sx, 8, sz,
             cxstart, 1024, czstart,
             lod, RequestType.Copy
@@ -536,40 +520,43 @@ internal class BlockEntityMap : BlockEntity
         Api.ModLoader.GetModSystem<Map3DModSystem>().LoadChunksV2(req);
     }
 
-    private void copyToDimension()
-    {
-        // Probably the least efficient way to do this.
-        int x0 = corner1.X;
-        int y0 = corner1.Y;
-        int z0 = corner1.Z;
-        int xlen = corner2.X - corner1.X;
-        int ylen = corner2.Y - corner1.Y;
-        int zlen = corner2.X - corner1.X;
-        int x0dst = -xlen / 2;
-        int y0dst = corner1.Y;
-        int z0dst = -zlen / 2;
-        for (int x = 0; x < xlen; x++)
-            for (int z = 0; z < zlen; z++)
-                for (int y = 0; y < ylen; y++)
-                {
-                    int blockid = Api.World.BlockAccessor.GetBlockId(new BlockPos(x0 + x, y0 + y, z0 + z, 0));
-                    var dst = new BlockPos(x0dst + x, y0dst + y, z0dst + z, 1);
-                    dimension.AdjustPosForSubDimension(dst);
-                    dimension.ExchangeBlock(blockid, dst);
-                }
-    }
+    // private void copyToDimension()
+    // {
+    //     // Probably the least efficient way to do this.
+    //     int x0 = corner1.X;
+    //     int y0 = corner1.Y;
+    //     int z0 = corner1.Z;
+    //     int xlen = corner2.X - corner1.X;
+    //     int ylen = corner2.Y - corner1.Y;
+    //     int zlen = corner2.X - corner1.X;
+    //     int x0dst = -xlen / 2;
+    //     int y0dst = corner1.Y;
+    //     int z0dst = -zlen / 2;
+    //     for (int x = 0; x < xlen; x++)
+    //         for (int z = 0; z < zlen; z++)
+    //             for (int y = 0; y < ylen; y++)
+    //             {
+    //                 int blockid = Api.World.BlockAccessor.GetBlockId(new BlockPos(x0 + x, y0 + y, z0 + z, 0));
+    //                 var dst = new BlockPos(x0dst + x, y0dst + y, z0dst + z, 1);
+    //                 dimension.AdjustPosForSubDimension(dst);
+    //                 dimension.ExchangeBlock(blockid, dst);
+    //             }
+    // }
 
     private void copySurfaceToDimension()
     {
-        int sx = corner2.X - corner1.X + 1;
-        int sy = corner2.Y - corner1.Y + 1;
-        int sz = corner2.Z - corner1.Z + 1;
+        int sx = srcSize.X;
+        int sy = srcSize.Y;
+        int sz = srcSize.Z;
+
+        BlockPos corner1 = center - new BlockPos(srcSize / 2, 0);
+        BlockPos corner2 = corner1 + new BlockPos(srcSize, 0);
 
         // Walk through all chunks. We start with z so we get the same order as when walking
         // the blocks (makes neighbor detection easier if we add/need that). We go over y
         // last because we don't need to iterate over all Y chunks.
 
-        BlockPos offset = new BlockPos(-sx / 2 - corner1.X, -corner1.Y, -sz / 2 - corner1.Z, 1);
+        BlockPos offset = new BlockPos(-sx / 2 - corner1.X, 0, -sz / 2 - corner1.Z, 1);
         dimension.AdjustPosForSubDimension(offset);
         int zmin = corner1.Z & 0x1f;
         for (int cz = corner1.Z >> 5; cz <= corner2.Z >> 5; cz++)
@@ -615,7 +602,7 @@ internal class BlockEntityMap : BlockEntity
                 {
                     for (int x = xmin; x < xmax; x++)
                     {
-                        for (int y = cSurface; y >= corner1.Y; y--)
+                        for (int y = cSurface; y >= 0; y--)
                         {
                             var chunk = chunkColumn[y >> 5];
                             int index3d = x + (z << 5) + (y << 10);
@@ -652,22 +639,26 @@ internal class BlockEntityMap : BlockEntity
 
         base.GetBlockInfo(forPlayer, dsc);
         dsc.AppendLine("<font color=\"#99c9f9\"><i>Breaking this block will remove map data + configuration</i></font>");
-
-        dsc.AppendLine(String.Format(
-            "Abs: ({0},{1},{2}) - ({3},{4},{5})",
-            corner1.X - D, corner1.Y, corner1.Z - D,
-            corner2.X - D, corner2.Y, corner2.Z - D
-        ));
-        dsc.AppendLine(String.Format(
-            "Relative: ({0},{1},{2}) - ({3},{4},{5})",
-            corner1.X - Pos.X, corner1.Y - Pos.Y, corner1.Z - Pos.Z,
-            corner2.X - Pos.X, corner2.Y - Pos.Y, corner2.Z - Pos.Z
-        ));
-        dsc.AppendLine(String.Format(
-            "Technical: ({0},{1},{2}) - ({3},{4},{5})",
-            corner1.X, corner1.Y, corner1.Z,
-            corner2.X, corner2.Y, corner2.Z
-        ));
+        dsc.AppendLine("");
+        dsc.AppendLine(String.Format("Center: ({0},{1})", center.X - D, center.Z - D));
+        dsc.AppendLine(String.Format("Relative: ({0},{1})", center.X - Pos.X, center.Z - Pos.Z));
+        dsc.AppendLine(String.Format("Size: ({0},{1})", srcSize.X, srcSize.Z));
+        dsc.AppendLine("Distance: " + distance);
+        // dsc.AppendLine(String.Format(
+        //     "Abs: ({0},{1},{2}) - ({3},{4},{5})",
+        //     corner1.X - D, corner1.Y, corner1.Z - D,
+        //     corner2.X - D, corner2.Y, corner2.Z - D
+        // ));
+        // dsc.AppendLine(String.Format(
+        //     "Relative: ({0},{1},{2}) - ({3},{4},{5})",
+        //     corner1.X - Pos.X, corner1.Y - Pos.Y, corner1.Z - Pos.Z,
+        //     corner2.X - Pos.X, corner2.Y - Pos.Y, corner2.Z - Pos.Z
+        // ));
+        // dsc.AppendLine(String.Format(
+        //     "Technical: ({0},{1},{2}) - ({3},{4},{5})",
+        //     corner1.X, corner1.Y, corner1.Z,
+        //     corner2.X, corner2.Y, corner2.Z
+        // ));
         dsc.AppendLine("");
         dsc.AppendLine("DimensionId: " + dimId);
         dsc.AppendLine("Size: " + (size / 32f) + " blocks");
@@ -696,18 +687,18 @@ internal class UpdateDimensionPacket
     [ProtoMember(1)]
     public MapMode mode;
     [ProtoMember(2)]
-    public BlockPos corner1;
+    public BlockPos center;
     [ProtoMember(3)]
-    public BlockPos corner2;
+    public Vec3i size;
     [ProtoMember(4)]
     public Lod lod;
 
     public UpdateDimensionPacket() { }
-    public UpdateDimensionPacket(MapMode mode, BlockPos corner1, BlockPos corner2, Lod lod)
+    public UpdateDimensionPacket(MapMode mode, BlockPos center, Vec3i size, Lod lod)
     {
         this.mode = mode;
-        this.corner1 = corner1;
-        this.corner2 = corner2;
+        this.center = center;
+        this.size = size;
         this.lod = lod;
     }
 }

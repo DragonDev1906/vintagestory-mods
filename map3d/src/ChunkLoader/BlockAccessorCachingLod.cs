@@ -131,6 +131,11 @@ class BlockAccessorLodCaching
     // I'm returning it just for convenience.
     private ServerChunk cleanupLikeIfWeCopied(ServerChunk chunk)
     {
+        if (chunk == null)
+        {
+            return null;
+        }
+
         // We are copying a normal (overworld) chunk here and are not initializing entities
         // and block entities properly when it is loaded. In addition, there may be some
         // issues if we just duplicate data and it wastes memory. To avoid these issues
