@@ -651,6 +651,8 @@ internal class BlockEntityMap : BlockEntity
         const int D = 512000;
 
         base.GetBlockInfo(forPlayer, dsc);
+        dsc.AppendLine("<font color=\"#99c9f9\"><i>Breaking this block will remove map data + configuration</i></font>");
+
         dsc.AppendLine(String.Format(
             "Abs: ({0},{1},{2}) - ({3},{4},{5})",
             corner1.X - D, corner1.Y, corner1.Z - D,
