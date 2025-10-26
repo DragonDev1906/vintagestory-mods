@@ -62,14 +62,13 @@ internal class BlockEntityMap : BlockEntity
 
     private void CreateDimensionClientSide(ICoreClientAPI api)
     {
-        system.Mod.Logger.Notification("Dimension: " + api.World.MiniDimensions.TryGetValue(dimId) + ".");
         dimension = new MapMiniDimension((BlockAccessorBase)api.World.BlockAccessor, Pos.ToVec3d(), api, scale);
         api.World.MiniDimensions[dimId] = dimension; // Usually done by GetOrCreateDimension
         dimension.SetSubDimensionId(dimId);
         dimension.CurrentPos = new(Pos.X, Pos.Y, Pos.Z);
         // We need to set this, otherwise Render will just ignore this dimension.
         dimension.selectionTrackingOriginalPos = Pos;
-        system.Mod.Logger.Notification("Dimension created on client-side: " + dimId.ToString() + " : " + Pos.ToVec3d().ToString());
+        system.Mod.Logger.Notification("Dimension created on client-side: dim=" + dimId.ToString() + ", " + Pos.ToVec3d().ToString());
         UpdateDimension();
     }
 
@@ -98,7 +97,6 @@ internal class BlockEntityMap : BlockEntity
         if (srcSize == null)
             srcSize = new Vec3i(201, 256, 201);
 
-        system.Mod.Logger.Notification("Initialize: " + dimId);
         // Create the dimension when this BE is loaded, thus it should
         // work for other players that have not interacted with the MapDisplay.
         if (api is ICoreClientAPI capi && dimId > 0)
@@ -347,7 +345,6 @@ internal class BlockEntityMap : BlockEntity
     {
         if (Api is ICoreClientAPI capi)
         {
-            system.Mod.Logger.Notification("Dimension count: " + capi.World.MiniDimensions.Count);
             // CreateDimensionClientSide(capi);
 
             // This will probably fail because we currently don't set the dimension.
@@ -424,9 +421,10 @@ internal class BlockEntityMap : BlockEntity
             sx = (sx + 31) / 32;
             sz = (sz + 31) / 32;
 
-            system.Mod.Logger.Notification("Loading map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
-
-
+            system.Mod.Logger.Notification(
+                "Loading chunks: dim={0}, cx={1}, cz={2}, sx={3}, sz={4}",
+                dimId, cxstart, czstart, sx, sz
+            );
 
             ChunkRequest req = ChunkRequest.SimpleLoad(
                 dimension.OnChunkLoaded,
