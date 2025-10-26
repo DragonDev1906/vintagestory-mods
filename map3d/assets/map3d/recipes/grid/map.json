@@ -1,0 +1,75 @@
+[
+  {
+    "ingredientPattern": "HKS,PGP,_T_",
+    "ingredients": {
+      "H": { "type": "item", "code": "game:hammer-*", "isTool": true },
+      "K": { "type": "item", "code": "game:knife-*", "isTool": true },
+      "S": { "type": "item", "code": "game:saw-*", "isTool": true },
+      "G": { "type": "item", "code": "game:gear-temporal" },
+      "P": {
+        "type": "item",
+        "code": "game:metalplate-*",
+        "name": "metal",
+        "quantity": 2,
+        "allowedVariants": [
+          "copper",
+          "bismuthbronze",
+          "blackbronze",
+          "tinbronze",
+          "brass",
+          "iron",
+          "meteoriciron",
+          "steel",
+          "silver",
+          "gold"
+        ]
+      },
+      "T": {
+        "type": "block",
+        "code": "game:table-*",
+        "name": "type",
+        "allowedVariants": ["normal", "whitemarble"]
+      }
+    },
+    "width": 3,
+    "height": 3,
+    "output": {
+      "type": "block",
+      "code": "map-table{type}-{metal}"
+    }
+  },
+  {
+    "ingredientPattern": "HKS,PGP,_T_",
+    "ingredients": {
+      "H": { "type": "item", "code": "game:hammer-*", "isTool": true },
+      "K": { "type": "item", "code": "game:knife-*", "isTool": true },
+      "S": { "type": "item", "code": "game:saw-*", "isTool": true },
+      "G": { "type": "item", "code": "game:gear-temporal" },
+      "P": {
+        "type": "item",
+        "code": "game:metalplate-*",
+        "name": "metal",
+        "quantity": 2,
+        "allowedVariants": [
+          "copper",
+          "bismuthbronze",
+          "blackbronze",
+          "tinbronze",
+          "brass",
+          "iron",
+          "meteoriciron",
+          "steel",
+          "silver",
+          "gold"
+        ]
+      },
+      "T": { "type": "block", "code": "game:glass-*" }
+    },
+    "width": 3,
+    "height": 3,
+    "output": {
+      "type": "block",
+      "code": "map-projector-{metal}"
+    }
+  }
+]
