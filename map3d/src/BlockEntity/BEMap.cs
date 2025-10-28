@@ -14,16 +14,16 @@ namespace Map3D;
 internal class BlockEntityMap : BlockEntity
 {
     // Can be null even if we know which dimensionID we need/use.
-    internal MapMiniDimension dimension;
+    internal MapMiniDimension? dimension;
 
     // Configuration for block copying and where the blocks are stored.
     private int dimId;
     internal MapMode mode;
     internal Lod lod;
-    internal BlockPos center;
-    internal Vec3i srcSize;
+    internal BlockPos center = null!; // Set during Initialize
+    internal Vec3i srcSize = new Vec3i(101, 256, 101);
 
-    private Map3DModSystem system;
+    private Map3DModSystem system = null!; // Set during Initialize
 
     private double distanceSq
     {
@@ -58,7 +58,7 @@ internal class BlockEntityMap : BlockEntity
         }
     }
 
-    private GuiDialogMap3d dlg;
+    private GuiDialogMap3d? dlg;
 
     private void CreateDimensionClientSide(ICoreClientAPI api)
     {
@@ -94,8 +94,6 @@ internal class BlockEntityMap : BlockEntity
         // These can differ from the current position, but these are some sane defaults.
         if (center == null)
             center = Pos;
-        if (srcSize == null)
-            srcSize = new Vec3i(201, 256, 201);
 
         // Create the dimension when this BE is loaded, thus it should
         // work for other players that have not interacted with the MapDisplay.
@@ -230,21 +228,25 @@ internal class BlockEntityMap : BlockEntity
             case (int)MapPacket.UpdateDimension:
                 {
                     UpdateDimensionPacket p = SerializerUtil.Deserialize<UpdateDimensionPacket>(data);
-                    // Check validity on the server-side (not just in the client-side GUI)
-                    int maxDistance = Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
-                    long dx = Pos.X - p.center.X;
-                    long dz = Pos.Z - p.center.Z;
-                    if (dx * dx + dz * dz > maxDistance * maxDistance)
+                    // Be defensive and don't change something if we get null.
+                    if (p.center != null)
                     {
-                        system.Mod.Logger.Warning("Client sent invalid UpdateDimensionPacket");
-                        return;
+                        // Check validity on the server-side (not just in the client-side GUI)
+                        int maxDistance = Block.Attributes?["maxDistance"]?.AsInt() ?? 0;
+                        long dx = Pos.X - p.center.X;
+                        long dz = Pos.Z - p.center.Z;
+                        if (dx * dx + dz * dz > maxDistance * maxDistance)
+                        {
+                            system.Mod.Logger.Warning("Client sent invalid UpdateDimensionPacket");
+                            return;
+                        }
+                        this.center = p.center;
                     }
-
-                    this.center = p.center;
-                    this.srcSize = p.size;
+                    if (p.size != null)
+                        this.srcSize = p.size;
                     this.mode = p.mode;
                     this.lod = p.lod;
-                    UpdateDimensionData();
+                    UpdateDimensionDataServer();
                     break;
                 }
             case (int)MapPacket.Configure:
@@ -280,7 +282,7 @@ internal class BlockEntityMap : BlockEntity
             rotation.Y = 0;
             rotation.Z = 0;
         }
-        if (allowRotation)
+        if (allowRotation && p.rotation != null)
         {
             rotation = p.rotation;
         }
@@ -348,7 +350,7 @@ internal class BlockEntityMap : BlockEntity
             // CreateDimensionClientSide(capi);
 
             // This will probably fail because we currently don't set the dimension.
-            if (dimension != null && (dlg == null || !dlg.IsOpened()))
+            if (dlg == null || !dlg.IsOpened())
             {
                 dlg = new GuiDialogMap3d("3D Map settings", capi, this);
                 dlg.OnClosed += () => { dlg.Dispose(); dlg = null; };
@@ -367,7 +369,7 @@ internal class BlockEntityMap : BlockEntity
             // For now we create a dimension immediately, later we'all
             // want a UI to select how that dimension should behave.
             dimension = new MapMiniDimension((BlockAccessorBase)sapi.World.BlockAccessor, Pos.ToVec3d(), Api, scale);
-            dimId = Map3DModSystem.Instance(sapi).AllocateMiniDimension(dimension);
+            dimId = Map3DModSystem.Instance(sapi).AllocateMiniDimensionServer(dimension);
 
             // Send dimensionId to the client
             MarkDirty();
@@ -389,72 +391,23 @@ internal class BlockEntityMap : BlockEntity
             // TODO: Do we need this?
             MarkDirty();
 
-            LoadChunks();
+            if (Api is ICoreServerAPI)
+                dimension.LoadChunksServer(srcSize);
         }
 
         return true;
     }
 
-    // TODO: Don't load all chunks in a single tick, that results in a giant lag spike.
-    private void LoadChunks()
-    {
-        if (Api is ICoreServerAPI sapi)
-        {
-            // TODO: Make sure the following gets updated to the new chunk aligned copying.
-
-            // This is what our sub dimension coordinates are based on.
-            int sx = srcSize.X;
-            int sz = srcSize.Z;
-
-            // Start with the center of the subdimension, see AdjustPosForSubDimension which
-            // does this calculation with block coordinates instead of chunk coordinates.
-            int cxmid = (dimId % 4096) * 512 + 256;
-            int czmid = (dimId / 4096) * 512 + 256;
-
-            // Go to the lower edge (and do the correct rounding).
-            // We need to divide by 2 because we're centered, then we need to divide by 32
-            // to get chunk coordinates. But we need to round up, otherwise we'll be missing data.
-            int cxstart = cxmid - ((sx + 62) >> 6);
-            int czstart = czmid - ((sz + 62) >> 6);
-
-            // From now on we need the size in chunks.
-            sx = (sx + 31) / 32;
-            sz = (sz + 31) / 32;
-
-            system.Mod.Logger.Notification(
-                "Loading chunks: dim={0}, cx={1}, cz={2}, sx={3}, sz={4}",
-                dimId, cxstart, czstart, sx, sz
-            );
-
-            ChunkRequest req = ChunkRequest.SimpleLoad(
-                dimension.OnChunkLoaded,
-                cxstart, 1024, czstart,
-                sx, 8, sz,
-                Lod.None
-            );
-            system.LoadChunksV2(req);
-
-
-
-            // int sx = corner2.X - corner1.X;
-            // int sy = corner2.X - corner1.X;
-            // var iter = Iter.ChunksInMinidim(Iter.Rect(-sx / 64, -sy / 64, sx / 64, sy / 64), dimId);
-            // sapi.ModLoader.GetModSystem<Map3DModSystem>().LoadChunks(iter);
-
-
-
-            // // We need to divide by 2 to get to the edge => Shift by 1
-            // // And we need to divide by 32 to convert to chunk coordinates => Shift by 5
-            // // Both together: Shift by 6.
-            // for (int cx = cxstart; cx <= cxend; cx++)
-            //     for (int cz = czstart; cz <= czend; cz++)
-            //         sapi.WorldManager.LoadChunkColumnForDimension(cx, cz, 1);
-        }
-    }
 
     // Should be called server-side.
-    public void UpdateDimensionData()
+    public void UpdateDimensionDataServer()
     {
+        if (dimension == null)
+        {
+            system.Mod.Logger.Error("Called UpdateDimensionData without having a dimension");
+            return;
+        }
+
         system.Mod.Logger.Notification("Update Dimension Data");
 
         dimension.ClearChunks();
@@ -468,10 +421,10 @@ internal class BlockEntityMap : BlockEntity
         switch (mode)
         {
             case MapMode.Copy:
-                copyToDimensionV2();
+                copyToDimensionV2Server();
                 break;
             case MapMode.Surface:
-                copySurfaceToDimension();
+                copySurfaceToDimensionServer();
                 break;
         }
 
@@ -481,7 +434,7 @@ internal class BlockEntityMap : BlockEntity
         MarkDirty();
     }
 
-    private void copyToDimensionV2()
+    private void copyToDimensionV2Server()
     {
         // This is what our sub dimension coordinates are based on.
         int sx = srcSize.X;
@@ -510,8 +463,9 @@ internal class BlockEntityMap : BlockEntity
         int cornerX = (center.X - srcSize.X / 2);
         int cornerZ = (center.Z - srcSize.Z / 2);
 
+        // Private function that is only called when the dimension exists
         var req = new ChunkRequest(
-            dimension.OnChunkLoaded,
+            dimension!.OnChunkLoaded,
             cornerX / 32, 0, cornerZ / 32,
             sx, 8, sz,
             cxstart, 1024, czstart,
@@ -543,7 +497,7 @@ internal class BlockEntityMap : BlockEntity
     //             }
     // }
 
-    private void copySurfaceToDimension()
+    private void copySurfaceToDimensionServer()
     {
         int sx = srcSize.X;
         int sy = srcSize.Y;
@@ -557,7 +511,8 @@ internal class BlockEntityMap : BlockEntity
         // last because we don't need to iterate over all Y chunks.
 
         BlockPos offset = new BlockPos(-sx / 2 - corner1.X, 0, -sz / 2 - corner1.Z, 1);
-        dimension.AdjustPosForSubDimension(offset);
+        // Private function that is only called when the dimension exists
+        dimension!.AdjustPosForSubDimension(offset);
         int zmin = corner1.Z & 0x1f;
         for (int cz = corner1.Z >> 5; cz <= corner2.Z >> 5; cz++)
         {
@@ -687,14 +642,14 @@ internal class UpdateDimensionPacket
     [ProtoMember(1)]
     public MapMode mode;
     [ProtoMember(2)]
-    public BlockPos center;
+    public BlockPos? center; // Cannot enforce these is non-null when malicious clients are involved, so let's assume they can be null.
     [ProtoMember(3)]
-    public Vec3i size;
+    public Vec3i? size;
     [ProtoMember(4)]
     public Lod lod;
 
     public UpdateDimensionPacket() { }
-    public UpdateDimensionPacket(MapMode mode, BlockPos center, Vec3i size, Lod lod)
+    public UpdateDimensionPacket(MapMode mode, BlockPos? center, Vec3i? size, Lod lod)
     {
         this.mode = mode;
         this.center = center;
@@ -707,14 +662,14 @@ internal class UpdateDimensionPacket
 internal class ConfigurePacket
 {
     [ProtoMember(1)]
-    public Vec3i offset; // In voxels
+    public Vec3i? offset; // In voxels
     [ProtoMember(2)]
-    public Vec3f rotation; // In °
+    public Vec3f? rotation; // In °
     [ProtoMember(3)]
     public int size; // In voxels
 
     public ConfigurePacket() { }
-    public ConfigurePacket(Vec3i offset, Vec3f rotation, int size)
+    public ConfigurePacket(Vec3i? offset, Vec3f? rotation, int size)
     {
         this.offset = offset;
         this.rotation = rotation;

@@ -38,7 +38,6 @@ public class ChunkRequest
 
     // TODO: mode enum/interface
 
-    private ChunkRequest() { }
     public ChunkRequest(
         ChunkLoaded onLoaded,
         int srcX, int srcY, int srcZ,
@@ -69,18 +68,7 @@ public class ChunkRequest
         Lod lod = Lod.None,
         RequestType type = RequestType.Load)
     {
-        return new ChunkRequest()
-        {
-            type = type,
-            lod = lod,
-            onLoaded = onLoaded,
-            dstX = cx,
-            dstY = cy,
-            dstZ = cz,
-            sizeX = sizeX,
-            sizeY = sizeY,
-            sizeZ = sizeZ,
-        };
+        return new ChunkRequest(onLoaded, 0, 0, 0, sizeX, sizeY, sizeZ, cx, cy, cz, lod, type);
     }
 
     // internal IEnumerable<(int, int, int, bool)> IterLod()

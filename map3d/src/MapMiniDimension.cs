@@ -86,6 +86,61 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
         return Mat4f.Translate(array, array, 0f - x, 0f - y, 0f - z);
     }
 
+
+    // TODO: Don't load all chunks in a single tick, that results in a giant lag spike.
+    public void LoadChunksServer(Vec3i size)
+    {
+        // TODO: Make sure the following gets updated to the new chunk aligned copying.
+
+        // This is what our sub dimension coordinates are based on.
+        int sx = size.X;
+        int sz = size.Z;
+
+        // Start with the center of the subdimension, see AdjustPosForSubDimension which
+        // does this calculation with block coordinates instead of chunk coordinates.
+        int cxmid = (subDimensionId % 4096) * 512 + 256;
+        int czmid = (subDimensionId / 4096) * 512 + 256;
+
+        // Go to the lower edge (and do the correct rounding).
+        // We need to divide by 2 because we're centered, then we need to divide by 32
+        // to get chunk coordinates. But we need to round up, otherwise we'll be missing data.
+        int cxstart = cxmid - ((sx + 62) >> 6);
+        int czstart = czmid - ((sz + 62) >> 6);
+
+        // From now on we need the size in chunks.
+        sx = (sx + 31) / 32;
+        sz = (sz + 31) / 32;
+
+        system.Mod.Logger.Notification(
+            "Loading chunks: dim={0}, cx={1}, cz={2}, sx={3}, sz={4}",
+            subDimensionId, cxstart, czstart, sx, sz
+        );
+
+        ChunkRequest req = ChunkRequest.SimpleLoad(
+            this.OnChunkLoaded,
+            cxstart, 1024, czstart,
+            sx, 8, sz,
+            Lod.None
+        );
+        system.LoadChunksV2(req);
+
+
+
+        // int sx = corner2.X - corner1.X;
+        // int sy = corner2.X - corner1.X;
+        // var iter = Iter.ChunksInMinidim(Iter.Rect(-sx / 64, -sy / 64, sx / 64, sy / 64), dimId);
+        // sapi.ModLoader.GetModSystem<Map3DModSystem>().LoadChunks(iter);
+
+
+
+        // // We need to divide by 2 to get to the edge => Shift by 1
+        // // And we need to divide by 32 to convert to chunk coordinates => Shift by 5
+        // // Both together: Shift by 6.
+        // for (int cx = cxstart; cx <= cxend; cx++)
+        //     for (int cz = czstart; cz <= czend; cz++)
+        //         sapi.WorldManager.LoadChunkColumnForDimension(cx, cz, 1);
+    }
+
     // Called for each chunk loaded by our own chunk loading+generation system.
     // The chunk is not known to the game (engine), yet. As of now it's just some data.
     internal void OnChunkLoaded(int cx, int cy, int cz, ServerChunk chunk)
@@ -112,7 +167,7 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
             ((long)(cy) << 42) // Includes the dimension
         );
 
-        system.AddChunkToLoadedList(cindex, chunk);
+        system.AddChunkToLoadedListServer(cindex, chunk);
         AddLoadedChunk(new Vec3i(cx, cy, cz), chunk);
     }
 
@@ -172,16 +227,21 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
         if (posY < mapSizeY)
         {
             int idx = posY / 32;
-            IWorldChunk ret = null;
+            IWorldChunk? ret = null;
             for (int y = 0; y < chunkMapSizeY; y++)
             {
                 IWorldChunk chunk = base.CreateChunkAt(posX, 32 * y, posZ);
                 if (y == idx)
                     ret = chunk;
             }
+
             if (ret == null)
                 system.Mod.Logger.Error("Could not find chunk at y={0} (idx={1}) after generating {2} chunks", posY, idx, chunkMapSizeY);
-            return ret;
+
+            // The code above cannot introduce a null, so this could only be null if the base class returns null,
+            // in which case it should be fine for us to do the same. In case this does ever happen: We have logged
+            // this as an error above, so it should be findable. Not much use in explicitly throwing an exception here I think.
+            return ret!;
         }
         else
             return base.CreateChunkAt(posX, posY, posZ);
@@ -219,7 +279,10 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
         if (block.ForFluidsLayer)
         {
             // oldblockid = (chunk.Data as ChunkData).GetFluid(index3d);
-            (chunk.Data as ChunkData).SetFluid(index3d, blockId);
+            if (chunk.Data is ChunkData data)
+                data.SetFluid(index3d, blockId);
+            else
+                system.Mod.Logger.Error("Chunk data is of unexpected type, not setting block in fluid layer");
         }
         else
         {

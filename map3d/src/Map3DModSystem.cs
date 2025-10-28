@@ -12,12 +12,13 @@ namespace Map3D;
 
 public class Map3DModSystem : ModSystem
 {
-    private ICoreServerAPI sapi;
+    private ICoreServerAPI? sapi;
     private int mapChunksY;
 
     // Fields normally not available but needed for chunk loading
-    private AccessTools.FieldRef<object, FastRWLock> _loadedChunksLock; // I don't think we can store the bound `ref FastRWLock`.
-    private Dictionary<long, ServerChunk> _loadedChunks; // Must only be accessed while holding the lock.
+    // If these are null we cannot load chunks. Since they depend directly on reflection, I don't want to crash the game if this happens, so we just disable functionality.
+    private AccessTools.FieldRef<object, FastRWLock>? _loadedChunksLock; // I don't think we can store the bound `ref FastRWLock`.
+    private Dictionary<long, ServerChunk>? _loadedChunks; // Must only be accessed while holding the lock.
 
     // Chunk loading queue
     private ConcurrentQueue<ChunkRequest> chunkLoadQueue = new();
@@ -45,28 +46,32 @@ public class Map3DModSystem : ModSystem
         this.sapi = api;
         base.StartServerSide(api);
 
-        api.Event.ChunkDirty += OnChunkDirty;
-        api.Event.GameWorldSave += OnGameWorldSave;
-        api.Event.SaveGameLoaded += OnSaveGameLoaded;
+        api.Event.ChunkDirty += OnChunkDirtyServer;
+        api.Event.GameWorldSave += OnGameWorldSaveServer;
+        api.Event.SaveGameLoaded += OnSaveGameLoadedServer;
 
         // I'd love to be able to just read this (or don't need it in the first place),
         // but for now this seems the only option.
         //
         // Unfortunatly almost everything in VS is a class. Just this stupid lock isn't.
-        ChunkDataPool chunkPool = readInternalField<ChunkDataPool>(api.World, "serverChunkDataPool");
+        ChunkDataPool? chunkPool = readInternalField<ChunkDataPool>(api.World, "serverChunkDataPool");
         _loadedChunks = readInternalField<Dictionary<long, ServerChunk>>(api.World, "loadedChunks");
         _loadedChunksLock = AccessTools.FieldRefAccess<FastRWLock>(typeof(ServerMain), "loadedChunksLock");
 
         if (chunkPool == null)
         {
             Mod.Logger.Error("Could not get ChunkDataPool using reflection, cannot load or copy chunks");
+            return;
         }
-        else
+        if (_loadedChunks == null)
         {
-            ChunkLoader chunkLoader = new(sapi.Event, this, chunkLoadQueue, Mod.Logger, chunkPool, sapi.World, sapi.WorldManager.CurrentWorldName);
-            Mod.Logger.Notification("Started ChunkLoader thread");
-            sapi.Server.AddServerThread("map3d-chunkload", chunkLoader);
+            Mod.Logger.Error("Could not get loadedChunks dict using reflection, cannot load or copy chunks");
+            return;
         }
+
+        ChunkLoader chunkLoader = new(sapi.Event, this, chunkLoadQueue, Mod.Logger, chunkPool, sapi.World, sapi.WorldManager.CurrentWorldName);
+        Mod.Logger.Notification("Started ChunkLoader thread");
+        sapi.Server.AddServerThread("map3d-chunkload", chunkLoader);
 
         // This is annoying: We can't connect to the save game DB in any of the start methods
         // because the DB is locked. We have to retry but that never succeeds during this time.
@@ -83,32 +88,34 @@ public class Map3DModSystem : ModSystem
     {
         if (sapi != null)
         {
-            sapi.Event.ChunkDirty -= OnChunkDirty;
-            sapi.Event.GameWorldSave -= OnGameWorldSave;
-            sapi.Event.SaveGameLoaded -= OnSaveGameLoaded;
+            sapi.Event.ChunkDirty -= OnChunkDirtyServer;
+            sapi.Event.GameWorldSave -= OnGameWorldSaveServer;
+            sapi.Event.SaveGameLoaded -= OnSaveGameLoadedServer;
 
             chunkLoadQueue.Clear();
         }
         base.Dispose();
     }
 
-    private void OnGameWorldSave()
+    private void OnGameWorldSaveServer()
     {
         if (freeDimensionsDirty)
         {
-            sapi.WorldManager.SaveGame.StoreData("map3d.freeDimensions", freeDimensions);
+            // Only called Server-side and only after StartServerSide was called.
+            sapi!.WorldManager.SaveGame.StoreData("map3d.freeDimensions", freeDimensions);
             freeDimensionsDirty = false;
         }
     }
-    private void OnSaveGameLoaded()
+    private void OnSaveGameLoadedServer()
     {
-        freeDimensions = sapi.WorldManager.SaveGame.GetData<List<int>>("map3d.freeDimensions") ?? new();
+        // Only called Server-side and only after StartServerSide was called.
+        freeDimensions = sapi!.WorldManager.SaveGame.GetData<List<int>>("map3d.freeDimensions") ?? new();
         freeDimensionsDirty = false;
 
 
     }
 
-    private void OnChunkDirty(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
+    private void OnChunkDirtyServer(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
     {
         // We cannot use ChunkColumnLoaded (even though we're loading the chunks that way),
         // because that event doesn't give us the Y coordinate and thus doesn't give us the dimension.
@@ -124,16 +131,17 @@ public class Map3DModSystem : ModSystem
             // dimensions.
             // See https://wiki.vintagestory.at/index.php/Modding:Minidimension#ChunkIndex3D
             int subDimensionId = ((chunkCoord.Z >> 9) << 12) + chunkCoord.X >> 9;
-            IMiniDimension dim = sapi.Server.GetMiniDimension(subDimensionId);
+            // Only called server-side after StartServerSide was called
+            IMiniDimension dim = sapi!.Server.GetMiniDimension(subDimensionId);
             if (dim is MapMiniDimension mdim)
                 mdim.AddLoadedChunk(chunkCoord, chunk);
         }
     }
 
-    private T readInternalField<T>(object obj, string fieldName)
+    private T? readInternalField<T>(object obj, string fieldName)
     {
 
-        FieldInfo field = obj.GetType().GetField(
+        FieldInfo? field = obj.GetType().GetField(
             fieldName,
             // Include public in case they change it to be public
             BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance
@@ -147,7 +155,12 @@ public class Map3DModSystem : ModSystem
         {
             Mod.Logger.Warning("{0}.{1} is public, reflection is no longer needed", obj.GetType().Name, fieldName);
         }
-        object val = field.GetValue(obj);
+        object? val = field.GetValue(obj);
+        if (val == null)
+        {
+            Mod.Logger.Warning("{0}.{1} is null", obj.GetType().Name, fieldName);
+            return default(T);
+        }
         if (!val.GetType().IsAssignableTo(typeof(T)))
         {
             Mod.Logger.Error("{0}.{1} has an unexpected type: {2} that is not assignable to {3}", obj.GetType().Name, fieldName, val.GetType(), typeof(T));
@@ -157,9 +170,14 @@ public class Map3DModSystem : ModSystem
     }
 
     // I wish we had access to this method and an easier way to create chunks.
-    public void AddChunkToLoadedList(long cindex, ServerChunk chunk)
+    public void AddChunkToLoadedListServer(long cindex, ServerChunk chunk)
     {
-        _loadedChunksLock.Invoke(sapi.World).AcquireWriteLock();
+        // Should never get this far, but this is a failsave to prevent crashing should we be
+        // unable to add loaded chunks due to changes in the basegame.
+        if (_loadedChunksLock == null || _loadedChunks == null)
+            return;
+
+        _loadedChunksLock.Invoke(sapi!.World).AcquireWriteLock();
         try
         {
             if (_loadedChunks.TryGetValue(cindex, out var value))
@@ -177,7 +195,7 @@ public class Map3DModSystem : ModSystem
         chunkLoadQueue.Enqueue(req);
     }
 
-    public int AllocateMiniDimension(IMiniDimension dim)
+    public int AllocateMiniDimensionServer(IMiniDimension dim)
     {
         int id;
         if (freeDimensions.Count > 0)
@@ -187,12 +205,12 @@ public class Map3DModSystem : ModSystem
             freeDimensions.RemoveAt(last);
             freeDimensionsDirty = true;
 
-            sapi.Server.SetMiniDimension(dim, id);
+            sapi!.Server.SetMiniDimension(dim, id);
             Mod.Logger.Notification("Reused subdimension id: {0}", id);
         }
         else
         {
-            id = sapi.Server.LoadMiniDimension(dim);
+            id = sapi!.Server.LoadMiniDimension(dim);
             Mod.Logger.Notification("Allocated new subdimension id: {0}", id);
         }
         dim.SetSubDimensionId(id);

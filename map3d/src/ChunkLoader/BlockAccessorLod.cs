@@ -13,10 +13,9 @@ namespace Map3D;
 // All chunk indicies (regardless of whether they are individual ints or a long) or after the
 // Lod is applied and thus don't directly correlate to the original chunks index. They are
 // divided by the Lod level.
-class BlockAccessorLodCaching
+class BlockAccessorLod
 {
     private GameFile db;
-    private Dictionary<long, ServerChunk> lodChunks;
     private Lod lod;
     private ushort size;    // Number of chunks to combine (same as number of blocks perblock) per dimension.
     private ushort invsize; // Non-descriptive name, but this is just 32/size.
@@ -26,7 +25,7 @@ class BlockAccessorLodCaching
     // This will (probably) only work with powers of 2, as I want to avoid the complexity
     // we get with other levels. If other levels are required, dimension scaling should
     // be used.
-    internal BlockAccessorLodCaching(GameFile db, Lod lod)
+    internal BlockAccessorLod(GameFile db, Lod lod)
     {
         this.db = db;
         this.lod = lod;
@@ -93,7 +92,7 @@ class BlockAccessorLodCaching
     // public 
 
     // Avoid these unless you need the entire chunk, they can get expensive at higher Lod levels.
-    public ServerChunk GetChunkOnce(int cx, int cy, int cz)
+    public ServerChunk? GetChunk(int cx, int cy, int cz)
     {
         // Fast path
         if (lod == Lod.None)
@@ -116,7 +115,7 @@ class BlockAccessorLodCaching
             for (ushort z = 0; z < size; z++)
                 for (ushort x = 0; x < size; x++)
                 {
-                    ServerChunk chunk = db.loadChunk(cx + x, cy + y, cz + z);
+                    ServerChunk? chunk = db.loadChunk(cx + x, cy + y, cz + z);
                     if (chunk != null)
                     {
                         chunk.Unpack();
@@ -129,7 +128,7 @@ class BlockAccessorLodCaching
 
     // The two chunks are identical and the same objects,
     // I'm returning it just for convenience.
-    private ServerChunk cleanupLikeIfWeCopied(ServerChunk chunk)
+    private ServerChunk? cleanupLikeIfWeCopied(ServerChunk? chunk)
     {
         if (chunk == null)
         {

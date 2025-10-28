@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Concurrent;
 using System.IO;
 using Vintagestory.API.Common;
@@ -6,6 +7,8 @@ using Vintagestory.Common;
 using Vintagestory.Server;
 
 namespace Map3D;
+
+class NoSavefileException : Exception { }
 
 class ChunkLoader : IAsyncServerSystem
 {
@@ -39,7 +42,7 @@ class ChunkLoader : IAsyncServerSystem
         if (!File.Exists(databaseFileName))
         {
             logger.Error("Save-file database does not exist");
-            return;
+            throw new NoSavefileException();
         }
 
         db = new GameFile(logger, chunkPool, worldAccessorForResolve, databaseFileName);
@@ -65,7 +68,7 @@ class ChunkLoader : IAsyncServerSystem
         // For simplicity let's only process one request per tick, which also
         // allows us to be shut down after every request. May be changed in
         // the future, but the overhead of doing this should be minimal.
-        if (!tasks.TryDequeue(out ChunkRequest req)) return;
+        if (!tasks.TryDequeue(out ChunkRequest? req)) return;
 
         // TODO: Process request
         switch (req.type)
@@ -93,7 +96,7 @@ class ChunkLoader : IAsyncServerSystem
         int count = 0;
         foreach ((int cx, int cy, int cz) in req.IterDestination())
         {
-            ServerChunk chunk = db.loadChunk(cx, cy, cz);
+            ServerChunk? chunk = db.loadChunk(cx, cy, cz);
             if (chunk != null && !chunk.Empty)
             {
                 count++;
@@ -106,7 +109,7 @@ class ChunkLoader : IAsyncServerSystem
 
     private void copy(ChunkRequest req)
     {
-        BlockAccessorLodCaching ba = new(db, req.lod);
+        BlockAccessorLod ba = new(db, req.lod);
 
         int count = 0;
         int srcX = ba.AdjustChunkPos(req.srcX);
@@ -121,7 +124,7 @@ class ChunkLoader : IAsyncServerSystem
                 for (int x = 0; x < sizeX; x++)
                 {
                     // TODO: Add boundry handling
-                    ServerChunk chunk = ba.GetChunkOnce(srcX + x, srcY + y, srcZ + z);
+                    ServerChunk? chunk = ba.GetChunk(srcX + x, srcY + y, srcZ + z);
                     if (chunk != null && !chunk.Empty)
                     {
                         count++;

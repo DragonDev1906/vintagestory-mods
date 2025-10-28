@@ -4,8 +4,6 @@ using Vintagestory.API.MathTools;
 using System;
 using System.Globalization;
 
-#nullable enable
-
 namespace Map3D;
 
 internal class GuiDialogMap3d : GuiDialogGeneric
@@ -212,18 +210,18 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         if (maxOffset > 0)
         {
             addLabel("Offset X");
-            offsetX = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.X - be.Pos.X, (value) =>
+            offsetX = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.offset.X, (value) =>
             {
                 UpdateServerSide();
             });
             addLabel("Offset Y");
-            offsetY = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.Y - be.Pos.Y, (value) =>
+            offsetY = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.offset.Y, (value) =>
             {
 
                 UpdateServerSide();
             });
             addLabel("Offset Z");
-            offsetZ = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.dimension.CurrentPos.Z - be.Pos.Z, (value) =>
+            offsetZ = addSliderFloat(w1, -4, 4, offsetSteps, " voxel", (float)be.offset.Z, (value) =>
             {
                 UpdateServerSide();
             });
@@ -232,7 +230,7 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         if (rotation)
         {
             addLabel("Yaw");
-            rotX = addSliderFloat(w1, -180, 180, 1, "°", be.dimension.CurrentPos.Yaw / deg2rad, (value) =>
+            rotX = addSliderFloat(w1, -180, 180, 1, "°", be.rotation.X / deg2rad, (value) =>
             {
                 UpdateServerSide();
             });
@@ -240,12 +238,12 @@ internal class GuiDialogMap3d : GuiDialogGeneric
         if (rotation && !restrictedRotation)
         {
             addLabel("Pitch");
-            rotY = addSliderFloat(w1, -90, 90, 1, "°", be.dimension.CurrentPos.Pitch / deg2rad, (value) =>
+            rotY = addSliderFloat(w1, -90, 90, 1, "°", be.rotation.Y / deg2rad, (value) =>
             {
                 UpdateServerSide();
             });
             addLabel("Roll");
-            rotZ = addSliderFloat(w1, -180, 180, 1, "°", be.dimension.CurrentPos.Roll / deg2rad, (value) =>
+            rotZ = addSliderFloat(w1, -180, 180, 1, "°", be.rotation.Z / deg2rad, (value) =>
             {
                 UpdateServerSide();
             });

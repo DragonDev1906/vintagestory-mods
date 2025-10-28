@@ -39,9 +39,9 @@ internal class GameFile
     }
 
     // See ServerSystemSupplyChunks, but without the column restriction.
-    internal ServerChunk loadChunk(int cx, int cy, int cz)
+    internal ServerChunk? loadChunk(int cx, int cy, int cz)
     {
-        byte[] data = getChunk(ChunkPos.ToChunkIndex(cx, cy & 0x1ff, cz, cy >> 10));
+        byte[]? data = getChunk(ChunkPos.ToChunkIndex(cx, cy & 0x1ff, cz, cy >> 10));
 
         // byte[] data = db.GetChunk(cx, cy & 0x1ff, cz, cy >> 10);
         if (data == null) return null;
@@ -61,7 +61,7 @@ internal class GameFile
         }
     }
 
-    private byte[] getChunk(ulong position)
+    private byte[]? getChunk(ulong position)
     {
         using SqliteCommand cmd = db.CreateCommand();
 

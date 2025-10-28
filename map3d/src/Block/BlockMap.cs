@@ -2,8 +2,6 @@ using System.Text;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 
-#nullable enable
-
 namespace Map3D;
 
 public class BlockMap : Block
