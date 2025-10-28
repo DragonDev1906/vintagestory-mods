@@ -68,8 +68,6 @@ internal class BlockEntityMap : BlockEntity
         dimension.CurrentPos = new(Pos.X, Pos.Y, Pos.Z);
         // We need to set this, otherwise Render will just ignore this dimension.
         dimension.selectionTrackingOriginalPos = Pos;
-        system.Mod.Logger.Notification("Dimension created on client-side: dim=" + dimId.ToString() + ", " + Pos.ToVec3d().ToString());
-        UpdateDimension();
     }
 
     // Interesting/Relevant
@@ -106,6 +104,10 @@ internal class BlockEntityMap : BlockEntity
             // as the server-side init is probably called first and thus we don't have a 
             // matching mini dimension.
             CreateDimensionClientSide(capi);
+            system.Mod.Logger.Notification(
+                "Dimension created (Initialize): dim=" + dimId.ToString() + ", " + Pos.ToVec3d().ToString()
+            );
+            UpdateDimension();
         }
 
         // NOTE: We may have to initialize the chunks on the client side first or ask for the chunks manually.
@@ -177,12 +179,15 @@ internal class BlockEntityMap : BlockEntity
     {
         base.FromTreeAttributes(tree, worldAccessForResolve);
 
+        // Load/Overwrite all the data
         int oldId = dimId;
         dimId = tree.GetAsInt("dimensionId");
         mode = (MapMode)tree.GetInt("mode");
         lod = (Lod)tree.GetInt("lod");
         center = tree.GetBlockPos("center");
-        srcSize = tree.GetVec3i("srcSize");
+        Vec3i? srcSize = tree.GetVec3i("srcSize");
+        if (srcSize != null)
+            this.srcSize = srcSize;
         offset = tree.GetVec3i("offset", Vec3i.Zero);
         float rotX = tree.GetFloat("rotX", 0);
         float rotY = tree.GetFloat("rotY", 0);
@@ -190,11 +195,15 @@ internal class BlockEntityMap : BlockEntity
         rotation = new(rotX, rotY, rotZ);
         size = tree.GetInt("size", 32);
 
+        // If the dimension is created on the server-side this function is called. Since we didn't have dimID
+        // previously we have not created the client-side dimension in Initialize, so we must do it now.
         if (Api is ICoreClientAPI api && oldId != dimId && dimId > 0)
         {
             CreateDimensionClientSide(api);
+            system.Mod.Logger.Notification(
+                "Dimension created (FromTreeAttributes): dim=" + dimId.ToString() + ", " + Pos.ToVec3d().ToString()
+            );
         }
-
         UpdateDimension();
     }
 
