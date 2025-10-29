@@ -126,7 +126,9 @@ internal class BlockEntityMap : BlockEntity
             // dimension = sapi.World.BlockAccessor.CreateMiniDimension(Pos.ToVec3d());
             int id = sapi.Server.SetMiniDimension(dimension, dimId);
             dimension.SetSubDimensionId(dimId);
-            system.Mod.Logger.Notification("SetMiniDimension: " + dimId + ":" + id);
+
+            // Load the chunks
+            dimension.LoadChunksServer(srcSize);
         }
     }
 
@@ -399,9 +401,6 @@ internal class BlockEntityMap : BlockEntity
 
             // TODO: Do we need this?
             MarkDirty();
-
-            if (Api is ICoreServerAPI)
-                dimension.LoadChunksServer(srcSize);
         }
 
         return true;
