@@ -68,6 +68,11 @@ internal class BlockEntityMap : BlockEntity
         dimension.CurrentPos = new(Pos.X, Pos.Y, Pos.Z);
         // We need to set this, otherwise Render will just ignore this dimension.
         dimension.selectionTrackingOriginalPos = Pos;
+
+        // Tell the server we're ready to receive chunks (this explicity opt-in lets us avoid performance problems
+        // in the default MiniDimension implementation when there is a significant amount of chunks).
+        // This is also where we could let the player decide if he even wants chunks from this dimension.
+        api.Network.SendBlockEntityPacket(Pos, (int)MapPacket.Ready4Chunks);
     }
 
     // Interesting/Relevant
@@ -103,10 +108,8 @@ internal class BlockEntityMap : BlockEntity
             // I think this only works if the server-side dimension is created on interaction,
             // as the server-side init is probably called first and thus we don't have a 
             // matching mini dimension.
+            system.Mod.Logger.Notification("Creating dimension {0} at {1}", dimId, Pos);
             CreateDimensionClientSide(capi);
-            system.Mod.Logger.Notification(
-                "Dimension created (Initialize): dim=" + dimId.ToString() + ", " + Pos.ToVec3d().ToString()
-            );
             UpdateDimension();
         }
 
@@ -128,6 +131,7 @@ internal class BlockEntityMap : BlockEntity
             dimension.SetSubDimensionId(dimId);
 
             // Load the chunks
+            // We could also lazily load these only after the first player said he is ready for chunks.
             dimension.LoadChunksServer(srcSize);
         }
     }
@@ -166,13 +170,13 @@ internal class BlockEntityMap : BlockEntity
 
             if (Api is ICoreClientAPI capi)
             {
-                system.Mod.Logger.Notification("Unloading dimension {0}", dimId);
+                system.Mod.Logger.Notification("Unloading dimension {0} at {1}", dimId, Pos);
                 // This stops rendering the mini dimension. Not sure if it deletes the chunk data.
                 capi.World.MiniDimensions.Remove(dimId);
                 dimension = null;
             }
             else
-                system.Mod.Logger.Notification("Would love to unload dimension on server side {0}", dimId);
+                system.Mod.Logger.Notification("Cannot unload dimension {0} at {1}", dimId, Pos);
         }
         base.OnBlockUnloaded();
     }
@@ -201,10 +205,8 @@ internal class BlockEntityMap : BlockEntity
         // previously we have not created the client-side dimension in Initialize, so we must do it now.
         if (Api is ICoreClientAPI api && oldId != dimId && dimId > 0)
         {
+            system.Mod.Logger.Notification("Creating new dimension {0} at {1}", dimId, Pos);
             CreateDimensionClientSide(api);
-            system.Mod.Logger.Notification(
-                "Dimension created (FromTreeAttributes): dim=" + dimId.ToString() + ", " + Pos.ToVec3d().ToString()
-            );
         }
         UpdateDimension();
     }
@@ -248,7 +250,7 @@ internal class BlockEntityMap : BlockEntity
                         long dz = Pos.Z - p.center.Z;
                         if (dx * dx + dz * dz > maxDistance * maxDistance)
                         {
-                            system.Mod.Logger.Warning("Client sent invalid UpdateDimensionPacket");
+                            system.Mod.Logger.Warning("Player '{0}' sent invalid UpdateDimensionPacket at {1}", fromPlayer.PlayerName, Pos);
                             return;
                         }
                         this.center = p.center;
@@ -265,6 +267,12 @@ internal class BlockEntityMap : BlockEntity
                     ConfigurePacket p = SerializerUtil.Deserialize<ConfigurePacket>(data);
                     ApplyConfigPacket(p);
                 }
+                break;
+            case (int)MapPacket.Ready4Chunks:
+                if (dimension != null)
+                    dimension.SetPlayerReady(fromPlayer, true);
+                else
+                    system.Mod.Logger.Warning("Player {0} sent Ready4Chunks but dimension {1} doesn't exist", fromPlayer.PlayerName, dimId);
                 break;
             default:
                 base.OnReceivedClientPacket(fromPlayer, packetid, data);
@@ -395,7 +403,7 @@ internal class BlockEntityMap : BlockEntity
                 dimension = new MapMiniDimension((BlockAccessorBase)sapi.World.BlockAccessor, Pos.ToVec3d(), Api, scale);
                 int id = sapi.Server.SetMiniDimension(dimension, dimId);
                 dimension.SetSubDimensionId(dimId);
-                system.Mod.Logger.Notification("SetMiniDimension: " + dimId + ":" + id);
+                system.Mod.Logger.Notification("Creating new dimension {0} at {1}", dimId, Pos);
 
             }
 
@@ -412,11 +420,11 @@ internal class BlockEntityMap : BlockEntity
     {
         if (dimension == null)
         {
-            system.Mod.Logger.Error("Called UpdateDimensionData without having a dimension");
+            system.Mod.Logger.Error("Called UpdateDimensionData without having a dimension at {0}", Pos);
             return;
         }
 
-        system.Mod.Logger.Notification("Update Dimension Data");
+        system.Mod.Logger.Notification("Updating dimension data {0} at {1}", dimId, Pos);
 
         dimension.ClearChunks();
         if (Api is ICoreServerAPI sapi)
@@ -437,6 +445,7 @@ internal class BlockEntityMap : BlockEntity
         }
 
         watch.Stop();
+        // TODO: I think this is no longer useful, as it is done asynchronously.
         system.Mod.Logger.Notification("UpdateDimensionData with mode {0} finished in {1} ms", mode, watch.ElapsedMilliseconds);
 
         MarkDirty();
@@ -642,6 +651,7 @@ internal enum MapPacket
     UpdateDimension = 0x5a7cd100, // Client -> Server
     Configure,       // Client -> Server
     ClearDimension,  // Server -> Client
+    Ready4Chunks,            // Client -> Server: Opt-into the chunks from that dimension
 }
 
 [ProtoContract]

@@ -2,6 +2,8 @@ using Vintagestory.Common;
 using Vintagestory.Server;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Map3D;
 
@@ -12,6 +14,13 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
     Map3DModSystem system;
     public float scale { get; set; }
 
+    // Wish I wouldn't have to do this (I avoided it long enough), but we do need a way to list all
+    // chunks in the dimension. This is a reference to the underlying BlockAccessorMovable, obtained
+    // via reflection. It is only null if we failed to get it via reflection, in which case not all
+    // functionality will be available (mainly the ability to send all loaded chunks to a player).
+    // This is probably preferrable to us crashing.
+    private Dictionary<long, IWorldChunk>? _chunks;
+
     // See https://github.com/bluelightning32/vs-dimensions-demo/blob/main/src/AnchoredDimension.cs
     public MapMiniDimension(BlockAccessorBase parent, Vec3d pos, ICoreAPI api, float scale = 1f)
         : base(parent, pos)
@@ -19,6 +28,9 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
         this.scale = scale;
         this.api = api;
         this.system = api.ModLoader.GetModSystem<Map3DModSystem>();
+        this._chunks = Map3DModSystem.readInternalField<BlockAccessorMovable, Dictionary<long, IWorldChunk>>(
+            system.Mod.Logger, (BlockAccessorMovable)this, "chunks"
+        );
     }
 
     public override void AdjustPosForSubDimension(BlockPos pos)
@@ -192,12 +204,87 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
         );
     }
 
+    enum PlayerState : byte
+    {
+        None,
+        AllChunks,
+        DirtyChunks,
+    }
+
+    // List of players that are ready/want to receive chunks from this dimension.
+    // This stores the ClientId. 
+    // TODO: We probably need/want to remove players when they leave.
+    private Dictionary<int, PlayerState> readyPlayers = new();
+
+    public void SetPlayerReady(IPlayer player, bool ready)
+    {
+        system.Mod.Logger.Notification(
+            "Player '{0}' ready for chunks {1} at {2}",
+            player.PlayerName, subDimensionId, CurrentPos.XYZ
+        );
+        readyPlayers[player.ClientId] = PlayerState.AllChunks;
+    }
+
     // REALLY IMPORTANT OVERRIDE.
     // This is called on the client side when receiving a chunk and on the server side
     // when a chunk is loaded. It iterates over ALL blocks (including air) in the mini dimension.
     // Normally it computes the center of mass, which is used for the RenderTransformMatrix,
     // but we don't use that value, so this override prevents a lot of wasted computation.
     public override void RecalculateCenterOfMass(IWorldAccessor world) { }
+
+    // Another REALLY IMPORTANT OVERRIDE.
+    // We have no control over when the dimension is created on the client-side, it usually happens
+    // after it was created on the server-side and thus after the server is sending chunks to the
+    // client. Normally this isn't a big problem, as the client-side will create a default
+    // IMiniDimension and puts the chunks there. Unfortunately, the default IMiniDimension is
+    // terrible at handling large amounts of chunks (see previous override), resulting in
+    // exponentially longer frame times and the client-side completely freezing.
+    // We have two options to avoid this:
+    // - Change the behavior of the default IMiniDimension via Harmony patching (would break other
+    //   mods that expect/require the center of mass)
+    // - Make absolutely certain we're only sending chunks to players that are ready to handle them.
+    //
+    // I've chosen the second option, hence this override. We could do this in
+    // `MarkChunkForSendingToPlayersInRange`, too, but this one is called less often.
+    public override void CollectChunksForSending(IPlayer[] players)
+    {
+        // TODO: We likely need special handling for new players, as they wouldn't receive already-loaded chunks.
+        var ready = new List<IPlayer>(players.Length);
+        foreach (var p in players)
+        {
+            if (!readyPlayers.TryGetValue(p.ClientId, out PlayerState state))
+                continue;
+
+            // Nice that C# has a switch expression that is exhaustive (would love to use it),
+            // but for some reason they decided that those always need a return type (and void is invalid).
+            switch (state)
+            {
+                case PlayerState.None:
+                    break;
+                case PlayerState.AllChunks:
+                    SendAllChunks(p);
+                    readyPlayers[p.ClientId] = PlayerState.DirtyChunks;
+                    break;
+                case PlayerState.DirtyChunks:
+                    ready.Add(p);
+                    break;
+            }
+        }
+
+        base.CollectChunksForSending(ready.ToArray());
+    }
+
+    private void SendAllChunks(IPlayer player)
+    {
+        if (_chunks == null)
+        {
+            system.Mod.Logger.Error("Cannot access chunk list to send all chunks to player {0}", player.PlayerName);
+            return;
+        }
+
+        foreach (var e in _chunks)
+            MarkChunkForSendingToPlayersInRange(e.Value, e.Key, player);
+    }
 
     // Cordinates are relative to the corner of the mini dimension
     public IWorldChunk GetOrCreateChunk(int cx, int cy, int cz)

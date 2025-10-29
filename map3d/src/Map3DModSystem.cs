@@ -54,8 +54,8 @@ public class Map3DModSystem : ModSystem
         // but for now this seems the only option.
         //
         // Unfortunatly almost everything in VS is a class. Just this stupid lock isn't.
-        ChunkDataPool? chunkPool = readInternalField<ChunkDataPool>(api.World, "serverChunkDataPool");
-        _loadedChunks = readInternalField<Dictionary<long, ServerChunk>>(api.World, "loadedChunks");
+        ChunkDataPool? chunkPool = readInternalField<ServerMain, ChunkDataPool>(Mod.Logger, (ServerMain)api.World, "serverChunkDataPool");
+        _loadedChunks = readInternalField<ServerMain, Dictionary<long, ServerChunk>>(Mod.Logger, (ServerMain)api.World, "loadedChunks");
         _loadedChunksLock = AccessTools.FieldRefAccess<FastRWLock>(typeof(ServerMain), "loadedChunksLock");
 
         if (chunkPool == null)
@@ -138,32 +138,37 @@ public class Map3DModSystem : ModSystem
         }
     }
 
-    private T? readInternalField<T>(object obj, string fieldName)
+    internal static T? readInternalField<O, T>(ILogger logger, O obj, string fieldName)
     {
+        if (obj == null)
+        {
+            logger.Error("{0}.{1} Cannot read internal field of null", typeof(O).Name, fieldName);
+            return default(T);
+        }
 
-        FieldInfo? field = obj.GetType().GetField(
+        FieldInfo? field = typeof(O).GetField(
             fieldName,
             // Include public in case they change it to be public
             BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance
         );
         if (field == null)
         {
-            Mod.Logger.Error("{0}.{1} does not exist", obj.GetType().Name, fieldName);
+            logger.Error("{0}.{1} does not exist", typeof(O).Name, fieldName);
             return default(T);
         }
         if (field.IsPublic)
         {
-            Mod.Logger.Warning("{0}.{1} is public, reflection is no longer needed", obj.GetType().Name, fieldName);
+            logger.Warning("{0}.{1} is public, reflection is no longer needed", typeof(O).Name, fieldName);
         }
         object? val = field.GetValue(obj);
         if (val == null)
         {
-            Mod.Logger.Warning("{0}.{1} is null", obj.GetType().Name, fieldName);
+            logger.Warning("{0}.{1} is null", typeof(O).Name, fieldName);
             return default(T);
         }
         if (!val.GetType().IsAssignableTo(typeof(T)))
         {
-            Mod.Logger.Error("{0}.{1} has an unexpected type: {2} that is not assignable to {3}", obj.GetType().Name, fieldName, val.GetType(), typeof(T));
+            logger.Error("{0}.{1} has an unexpected type: {2} that is not assignable to {3}", typeof(O).Name, fieldName, val.GetType(), typeof(T));
             return default(T);
         }
         return (T)val;

@@ -10,6 +10,7 @@ internal class GuiDialogMap3d : GuiDialogGeneric
 {
     // I'm not 100% sure where this comes from, but this converts the positions into
     // the coordinates shown to the player (minimap).
+    // TODO: Today I learned that this depends on the spawnpoint.
     const int coordinateOffset = 512000;
     const float deg2rad = 0.01745329f; // 2pi / 360
     const int offsetSteps = 32; // voxel (based on textures)
