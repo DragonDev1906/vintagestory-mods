@@ -92,18 +92,13 @@ class BlockAccessorLod
     // public 
 
     // Avoid these unless you need the entire chunk, they can get expensive at higher Lod levels.
-    public ServerChunk? GetChunk(int cx, int cy, int cz)
+    public ServerChunk? GetChunk(ulong cindex)
     {
         // Fast path
         if (lod == Lod.None)
         {
-            return cleanupLikeIfWeCopied(db.loadChunk(cx, cy, cz));
+            return cleanupLikeIfWeCopied(db.loadChunk(cindex));
         }
-
-        // Convert lod coordinates to real coordinates.
-        cx = cx << shift;
-        cy = cy << shift;
-        cz = cz << shift;
 
         ServerChunk lodchunk = ServerChunk.CreateNew(db.chunkPool);
         lodchunk.Unpack();
@@ -115,7 +110,9 @@ class BlockAccessorLod
             for (ushort z = 0; z < size; z++)
                 for (ushort x = 0; x < size; x++)
                 {
-                    ServerChunk? chunk = db.loadChunk(cx + x, cy + y, cz + z);
+                    // Convert lod coordinates to real coordinates.
+                    ulong prelod = (cindex >> shift) + (ulong)x + ((ulong)z << 27) + ((ulong)y << 54);
+                    ServerChunk? chunk = db.loadChunk(prelod);
                     if (chunk != null)
                     {
                         chunk.Unpack();
@@ -404,13 +401,6 @@ class BlockAccessorLod
             | (long)cy << 42
             | (long)dim << 52;
 
-    }
-    // Behaves just like the normal index3d
-    private long ChunkIndex(int cx, int cy, int cz)
-    {
-        return (long)cx
-            | (long)cz << 21
-            | (long)cy << 42;
     }
     private long ChunkToLodIndex(long index)
     {

@@ -10,21 +10,30 @@ namespace Map3D;
 
 class NoSavefileException : Exception { }
 
-class ChunkLoader : IAsyncServerSystem
+public interface IChunkLoader
+{
+    ILogger logger { get; }
+    GameFile db { get; }
+
+    public ServerChunk? loadFromDB(ulong cindex);
+    public void Send(IChunkReceiver receiver, ulong cindex, ServerChunk chunk);
+}
+
+class ChunkLoader : IAsyncServerSystem, IChunkLoader
 {
     IEventAPI api;
-    ConcurrentQueue<ChunkRequest> tasks;
-    ILogger logger;
+    ConcurrentQueue<IChunkRequest> tasks;
+    public ILogger logger { get; private set; }
     ChunkDataPool chunkPool;
     IWorldAccessor worldAccessorForResolve; // Don't read blocks from this, we're in another thread.
-    GameFile db;
+    public GameFile db { get; private set; }
 
     // Lot's of things we need. Unfortunately we can't use the existing ChunkDataPool
     // because we don't have access to it.
     public ChunkLoader(
         IEventAPI api,
         Map3DModSystem modSystem,
-        ConcurrentQueue<ChunkRequest> tasks,
+        ConcurrentQueue<IChunkRequest> tasks,
         ILogger logger,
         ChunkDataPool chunkPool,
         IWorldAccessor worldAccessorForResolve,
@@ -68,20 +77,9 @@ class ChunkLoader : IAsyncServerSystem
         // For simplicity let's only process one request per tick, which also
         // allows us to be shut down after every request. May be changed in
         // the future, but the overhead of doing this should be minimal.
-        if (!tasks.TryDequeue(out ChunkRequest? req)) return;
+        if (!tasks.TryDequeue(out IChunkRequest? req)) return;
 
-        // TODO: Process request
-        switch (req.type)
-        {
-            case RequestType.Load: // Only load existing chunks
-                load(req);
-                break;
-            case RequestType.Copy: // Copy from overworld, even if chunk exists
-                copy(req);
-                break;
-            case RequestType.LoadOrCopy: // Load if it exists, otherwise copy
-                break;
-        }
+        req.process_all(this);
     }
 
     public void ThreadDispose()
@@ -89,64 +87,38 @@ class ChunkLoader : IAsyncServerSystem
         this.db.Dispose();
     }
 
-    #region RequestType processing
-
-    private void load(ChunkRequest req)
+    public ServerChunk? loadFromDB(ulong cindex)
     {
-        int count = 0;
-        foreach ((int cx, int cy, int cz) in req.IterDestination())
-        {
-            ServerChunk? chunk = db.loadChunk(cx, cy, cz);
-            if (chunk != null && !chunk.Empty)
-            {
-                count++;
-                send(req, cx, cy, cz, chunk);
-            }
-        }
-        int total = req.TotalChunkCount();
-        logger.Notification("RequestType.Load finished. chunks={0}/{1}", count, total);
+        // DB file uses a different indexing scheme.
+        // I'm not sure if this is the most efficient way, but we need the cindex regardless.
+
+        /*
+            cindex:
+            reserved 	dimension 	guard 	chunkY 	chunkZ 	chunkX
+            2 bits 	    10 bits 	1 bit 	9 bits 	21 bits 21 bits
+
+            cpos:
+            reserved 	chunkY 	dimension high part 	guard 	chunkZ 	dimension low part 	guard 	chunkX
+            1 bit 	    9 bits 	5 bit 	                1 bit 	21 bits 5 bits 	            1 bit 	21 bits
+
+RRDDDDDDDDDD_YYYYYYYYYZZZZZZZZZZZZZZZZZZZZZXXXXXXXXXXXXXXXXXXXXX
+_YYYYYYYYYDDDDD_ZZZZZZZZZZZZZZZZZZZZZDDDDD_XXXXXXXXXXXXXXXXXXXXX
+         */
+
+        ulong cpos = (cindex & 0x1fffff) // x
+            | ((cindex << 6) & ((ulong)0x1fffff << 27)) // z
+            | ((cindex << 12) & ((ulong)0x1ff << 54)) // y
+            | ((cindex >> 8) & ((ulong)0x1f << 49)) // dim upper
+            | ((cindex >> 30) & ((ulong)0x1f << 22)); // dim lower
+
+        if (((cindex >> 42) & 0xff) == 0)
+            logger.Notification("cpos: {0}", cpos);
+
+        return db.loadChunk(cpos);
     }
 
-    private void copy(ChunkRequest req)
+    public void Send(IChunkReceiver receiver, ulong cindex, ServerChunk chunk)
     {
-        BlockAccessorLod ba = new(db, req.lod);
-
-        int count = 0;
-        int srcX = ba.AdjustChunkPos(req.srcX);
-        int srcY = ba.AdjustChunkPos(req.srcY);
-        int srcZ = ba.AdjustChunkPos(req.srcZ);
-        int sizeX = ba.AdjustSize(req.sizeX);
-        int sizeY = ba.AdjustSize(req.sizeY);
-        int sizeZ = ba.AdjustSize(req.sizeZ);
-
-        for (int y = 0; y < sizeY; y++)
-            for (int z = 0; z < sizeZ; z++)
-                for (int x = 0; x < sizeX; x++)
-                {
-                    // TODO: Add boundry handling
-                    ServerChunk? chunk = ba.GetChunk(srcX + x, srcY + y, srcZ + z);
-                    if (chunk != null && !chunk.Empty)
-                    {
-                        count++;
-                        chunk.DirtyForSaving = true; // Make sure this chunk gets saved, as we didn't do that.
-                        send(req, req.dstX + x, req.dstY + y, req.dstZ + z, chunk);
-                    }
-                }
-
-        int total = req.TotalChunkCount();
-        logger.Notification("RequestType.Copy finished. chunks={0}/{1}", count, total);
-    }
-
-    #endregion
-
-    private void send(ChunkRequest req, int cx, int cy, int cz, ServerChunk chunk)
-    {
-        if (chunk != null)
-        {
-            api.EnqueueMainThreadTask(delegate
-            {
-                req.onLoaded(cx, cy, cz, chunk);
-            }, "map3d-loadchunk");
-        }
+        api.EnqueueMainThreadTask(delegate { receiver.LoadChunk(cindex, chunk); }, "map3d-loadchunk");
     }
 }

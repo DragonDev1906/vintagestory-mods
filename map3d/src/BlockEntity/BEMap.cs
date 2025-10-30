@@ -471,48 +471,17 @@ internal class BlockEntityMap : BlockEntity
         int cxstart = cxmid - ((sx + 62) >> (6 + shift));
         int czstart = czmid - ((sz + 62) >> (6 + shift));
 
-        // From now on we need the size in chunks.
-        sx = (sx + 31) / 32;
-        sz = (sz + 31) / 32;
-
-        system.Mod.Logger.Notification("Copying map3d chunks: ({0},{1}), size = ({2},{3})", cxstart, czstart, sx, sz);
-
-        int cornerX = (center.X - srcSize.X / 2);
-        int cornerZ = (center.Z - srcSize.Z / 2);
-
-        // Private function that is only called when the dimension exists
-        var req = new ChunkRequest(
-            dimension!.OnChunkLoaded,
-            cornerX / 32, 0, cornerZ / 32,
-            sx, 8, sz,
-            cxstart, 1024, czstart,
-            lod, RequestType.Copy
-        );
-        system.LoadChunksV2(req);
+        system.LoadChunksV2(new CopyRequest(
+            dimension!, // Only called if dimension is not null
+            new BlockPos(
+                center.X - srcSize.X / 2,
+                0,
+                center.Z - srcSize.Z / 2
+            ),
+            new BlockPos(32 * cxmid - sx / 2, 0, 32 * czmid - sz / 2, 1),
+            srcSize
+        ));
     }
-
-    // private void copyToDimension()
-    // {
-    //     // Probably the least efficient way to do this.
-    //     int x0 = corner1.X;
-    //     int y0 = corner1.Y;
-    //     int z0 = corner1.Z;
-    //     int xlen = corner2.X - corner1.X;
-    //     int ylen = corner2.Y - corner1.Y;
-    //     int zlen = corner2.X - corner1.X;
-    //     int x0dst = -xlen / 2;
-    //     int y0dst = corner1.Y;
-    //     int z0dst = -zlen / 2;
-    //     for (int x = 0; x < xlen; x++)
-    //         for (int z = 0; z < zlen; z++)
-    //             for (int y = 0; y < ylen; y++)
-    //             {
-    //                 int blockid = Api.World.BlockAccessor.GetBlockId(new BlockPos(x0 + x, y0 + y, z0 + z, 0));
-    //                 var dst = new BlockPos(x0dst + x, y0dst + y, z0dst + z, 1);
-    //                 dimension.AdjustPosForSubDimension(dst);
-    //                 dimension.ExchangeBlock(blockid, dst);
-    //             }
-    // }
 
     private void copySurfaceToDimensionServer()
     {
@@ -616,21 +585,6 @@ internal class BlockEntityMap : BlockEntity
         dsc.AppendLine(String.Format("Relative: ({0},{1})", center.X - Pos.X, center.Z - Pos.Z));
         dsc.AppendLine(String.Format("Size: ({0},{1})", srcSize.X, srcSize.Z));
         dsc.AppendLine("Distance: " + distance);
-        // dsc.AppendLine(String.Format(
-        //     "Abs: ({0},{1},{2}) - ({3},{4},{5})",
-        //     corner1.X - D, corner1.Y, corner1.Z - D,
-        //     corner2.X - D, corner2.Y, corner2.Z - D
-        // ));
-        // dsc.AppendLine(String.Format(
-        //     "Relative: ({0},{1},{2}) - ({3},{4},{5})",
-        //     corner1.X - Pos.X, corner1.Y - Pos.Y, corner1.Z - Pos.Z,
-        //     corner2.X - Pos.X, corner2.Y - Pos.Y, corner2.Z - Pos.Z
-        // ));
-        // dsc.AppendLine(String.Format(
-        //     "Technical: ({0},{1},{2}) - ({3},{4},{5})",
-        //     corner1.X, corner1.Y, corner1.Z,
-        //     corner2.X, corner2.Y, corner2.Z
-        // ));
         dsc.AppendLine("");
         dsc.AppendLine("DimensionId: " + dimId);
         dsc.AppendLine("Size: " + (size / 32f) + " blocks");

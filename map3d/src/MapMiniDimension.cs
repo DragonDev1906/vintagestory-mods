@@ -3,11 +3,10 @@ using Vintagestory.Server;
 using Vintagestory.API.Common;
 using Vintagestory.API.MathTools;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Map3D;
 
-public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
+public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkReceiver
 {
     // TODO: Remove api
     ICoreAPI api;
@@ -113,94 +112,17 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension
         int cxmid = (subDimensionId % 4096) * 512 + 256;
         int czmid = (subDimensionId / 4096) * 512 + 256;
 
-        // Go to the lower edge (and do the correct rounding).
-        // We need to divide by 2 because we're centered, then we need to divide by 32
-        // to get chunk coordinates. But we need to round up, otherwise we'll be missing data.
-        int cxstart = cxmid - ((sx + 62) >> 6);
-        int czstart = czmid - ((sz + 62) >> 6);
-
-        // From now on we need the size in chunks.
-        sx = (sx + 31) / 32;
-        sz = (sz + 31) / 32;
-
-        system.Mod.Logger.Notification(
-            "Loading chunks: dim={0}, cx={1}, cz={2}, sx={3}, sz={4}",
-            subDimensionId, cxstart, czstart, sx, sz
-        );
-
-        ChunkRequest req = ChunkRequest.SimpleLoad(
-            this.OnChunkLoaded,
-            cxstart, 1024, czstart,
-            sx, 8, sz,
-            Lod.None
-        );
-        system.LoadChunksV2(req);
-
-
-
-        // int sx = corner2.X - corner1.X;
-        // int sy = corner2.X - corner1.X;
-        // var iter = Iter.ChunksInMinidim(Iter.Rect(-sx / 64, -sy / 64, sx / 64, sy / 64), dimId);
-        // sapi.ModLoader.GetModSystem<Map3DModSystem>().LoadChunks(iter);
-
-
-
-        // // We need to divide by 2 to get to the edge => Shift by 1
-        // // And we need to divide by 32 to convert to chunk coordinates => Shift by 5
-        // // Both together: Shift by 6.
-        // for (int cx = cxstart; cx <= cxend; cx++)
-        //     for (int cz = czstart; cz <= czend; cz++)
-        //         sapi.WorldManager.LoadChunkColumnForDimension(cx, cz, 1);
+        system.LoadChunksV2(new LoadRequest(this, new BlockPos(32 * cxmid - size.X / 2, 0, 32 * czmid - size.Z / 2, 1), size));
     }
 
-    // Called for each chunk loaded by our own chunk loading+generation system.
-    // The chunk is not known to the game (engine), yet. As of now it's just some data.
-    internal void OnChunkLoaded(int cx, int cy, int cz, ServerChunk chunk)
+    public void LoadChunk(ulong cindex, ServerChunk chunk)
     {
-        // TODO: We may have to check if the server is still running and this dimension still exists.
-
-        // The game/engine is not aware of this chunk. Unfortunately making it aware is insanely
-        // difficult because the required fields are internal and locked behind a FastRWLock that
-        // is implemented via a struct, which makes getting it via Reflection difficult.
-        // It might be possible with Unsafe and/or Harmony transpiling (+ maybe reverse patches),
-        // but I couldn't figure that out yet.
-        //
-        // This means we have to create a new chunk and copy over the data and hope it's performant.
-        // Would be interesting to know if this is faster or slower than processing an entire chunk
-        // column.
-
-        // Expects block positions relative to the mini dimension corner.
-        // IWorldChunk dst = base.CreateChunkAt((cx & 0x1ff) << 5, (cy & 0x1ff) << 5, (cz & 0x1ff) << 5);
-        // dst.Data.SetBlockAir
-
-        long cindex = (
-            cx +
-            ((long)(cz) << 21) +
-            ((long)(cy) << 42) // Includes the dimension
-        );
-
-        system.AddChunkToLoadedListServer(cindex, chunk);
-        AddLoadedChunk(new Vec3i(cx, cy, cz), chunk);
-    }
-
-    // Chunk coord contains the dimension in its Y coordinate.
-    internal void AddLoadedChunk(Vec3i chunkCoord, IWorldChunk chunk)
-    {
-        long cindex = (
-            chunkCoord.X +
-            ((long)(chunkCoord.Z) << 21) +
-            ((long)(chunkCoord.Y) << 42) // Includes the dimension
-        );
-        // This (probably) isn't the right function to call, but it's the only one that allows us to
-        // add something to base.chunks, so we have to use it.
-        base.ReceiveClientChunk(cindex, chunk, api.World);
-        // Annoyingly this function wants block coordinates, though not in the centered coordinate system.
-        // and there is no other way to mark a chunk dirty. Luckily these are still easy to get.
-        // Here we are not in the chunk but need the entire X coordinate (in the subdim)
+        system.AddChunkToLoadedListServer((long)cindex, chunk);
+        base.ReceiveClientChunk((long)cindex, chunk, api.World);
         base.MarkChunkDirty(
-            ((chunkCoord.X & 0x1ff) << 5),
-            ((chunkCoord.Y & 0x1ff) << 5),
-            ((chunkCoord.Z & 0x1ff) << 5)
+            (int)((cindex & 0x1ff) << 5),
+            (int)((cindex >> (42 - 5)) & 0x3ff0),
+            (int)((cindex >> (21 - 5)) & 0x3ff0)
         );
     }
 

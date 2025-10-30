@@ -11,7 +11,7 @@ namespace Map3D;
 // Like the GameDatabase abstraction but simpler and not as problematic to initialize.
 // In addition to that it has some convenient functions to deserialize chunks that are
 // normally found elsewhere.
-internal class GameFile
+public class GameFile
 {
     SqliteConnection db;
     internal ILogger logger;
@@ -41,7 +41,13 @@ internal class GameFile
     // See ServerSystemSupplyChunks, but without the column restriction.
     internal ServerChunk? loadChunk(int cx, int cy, int cz)
     {
-        byte[]? data = getChunk(ChunkPos.ToChunkIndex(cx, cy & 0x1ff, cz, cy >> 10));
+        return loadChunk(ChunkPos.ToChunkIndex(cx, cy & 0x1ff, cz, cy >> 10));
+    }
+    // Note that this differs from the cindex used everywhere else.
+    // See https://wiki.vintagestory.at/Special:MyLanguage/Modding:VCDBS_format#ChunkPos
+    internal ServerChunk? loadChunk(ulong cpos)
+    {
+        byte[]? data = getChunk(cpos);
 
         // byte[] data = db.GetChunk(cx, cy & 0x1ff, cz, cy >> 10);
         if (data == null) return null;

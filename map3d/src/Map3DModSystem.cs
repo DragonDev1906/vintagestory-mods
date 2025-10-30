@@ -1,6 +1,5 @@
 ﻿using Vintagestory.API.Server;
 using Vintagestory.API.Common;
-using Vintagestory.API.MathTools;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using Vintagestory.Common;
@@ -21,7 +20,7 @@ public class Map3DModSystem : ModSystem
     private Dictionary<long, ServerChunk>? _loadedChunks; // Must only be accessed while holding the lock.
 
     // Chunk loading queue
-    private ConcurrentQueue<ChunkRequest> chunkLoadQueue = new();
+    private ConcurrentQueue<IChunkRequest> chunkLoadQueue = new();
 
     // Persisted between restarts/reloads
     private bool freeDimensionsDirty = false;
@@ -46,7 +45,6 @@ public class Map3DModSystem : ModSystem
         this.sapi = api;
         base.StartServerSide(api);
 
-        api.Event.ChunkDirty += OnChunkDirtyServer;
         api.Event.GameWorldSave += OnGameWorldSaveServer;
         api.Event.SaveGameLoaded += OnSaveGameLoadedServer;
 
@@ -88,7 +86,6 @@ public class Map3DModSystem : ModSystem
     {
         if (sapi != null)
         {
-            sapi.Event.ChunkDirty -= OnChunkDirtyServer;
             sapi.Event.GameWorldSave -= OnGameWorldSaveServer;
             sapi.Event.SaveGameLoaded -= OnSaveGameLoadedServer;
 
@@ -113,29 +110,6 @@ public class Map3DModSystem : ModSystem
         freeDimensionsDirty = false;
 
 
-    }
-
-    private void OnChunkDirtyServer(Vec3i chunkCoord, IWorldChunk chunk, EnumChunkDirtyReason reason)
-    {
-        // We cannot use ChunkColumnLoaded (even though we're loading the chunks that way),
-        // because that event doesn't give us the Y coordinate and thus doesn't give us the dimension.
-        // From what I can tell we also can't get it from chunk itself, so we have to use this more
-        // verbose event.
-        int dimension = chunkCoord.Y >> 10;
-        if (dimension == 1 && reason == EnumChunkDirtyReason.NewlyLoaded)
-        {
-            // A chunk in the relevant dimension that was just loaded.
-            // It's not neccessarily from us (anyone that uses the mini dimension system
-            // and loads chunks can cause this), but at the moment it's likely ours.
-            // Next we get the subdimension ID and check if it is actually one of our mini
-            // dimensions.
-            // See https://wiki.vintagestory.at/index.php/Modding:Minidimension#ChunkIndex3D
-            int subDimensionId = ((chunkCoord.Z >> 9) << 12) + chunkCoord.X >> 9;
-            // Only called server-side after StartServerSide was called
-            IMiniDimension dim = sapi!.Server.GetMiniDimension(subDimensionId);
-            if (dim is MapMiniDimension mdim)
-                mdim.AddLoadedChunk(chunkCoord, chunk);
-        }
     }
 
     internal static T? readInternalField<O, T>(ILogger logger, O obj, string fieldName)
@@ -195,7 +169,7 @@ public class Map3DModSystem : ModSystem
         }
     }
 
-    public void LoadChunksV2(ChunkRequest req)
+    internal void LoadChunksV2(IChunkRequest req)
     {
         chunkLoadQueue.Enqueue(req);
     }
