@@ -125,7 +125,7 @@ class BlockAccessorLod
 
     // The two chunks are identical and the same objects,
     // I'm returning it just for convenience.
-    private ServerChunk? cleanupLikeIfWeCopied(ServerChunk? chunk)
+    internal static ServerChunk? cleanupLikeIfWeCopied(ServerChunk? chunk)
     {
         if (chunk == null)
         {

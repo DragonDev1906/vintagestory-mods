@@ -132,7 +132,7 @@ internal class BlockEntityMap : BlockEntity
 
             // Load the chunks
             // We could also lazily load these only after the first player said he is ready for chunks.
-            dimension.LoadChunksServer(srcSize);
+            dimension.LoadChunksServer(srcSize, center.AsVec3i);
         }
     }
 
@@ -346,9 +346,13 @@ internal class BlockEntityMap : BlockEntity
             bool allowRotation = Block.Attributes?["rotation"]?.AsBool() ?? false;
             bool restrictedRotation = Block.Attributes?["restrictedRotation"]?[Block.Variant["type"]]?.AsBool() ?? false;
 
+            // - Pos is where the block is
+            // - _center is a fixed place relative to the block position
+            // - offset is the player provided offset (in voxels)
             dimension.CurrentPos.X = Pos.X + xcenter + offset.X / 32f;
             dimension.CurrentPos.Y = Pos.Y + ycenter + offset.Y / 32f;
             dimension.CurrentPos.Z = Pos.Z + zcenter + offset.Z / 32f;
+            dimension.scale = scale;
             if (allowRotation && rotation != null)
             {
                 dimension.CurrentPos.Yaw = rotation.X;
@@ -358,7 +362,13 @@ internal class BlockEntityMap : BlockEntity
                     dimension.CurrentPos.Roll = rotation.Z;
                 }
             }
-            dimension.scale = scale;
+            // First part undoes the offset inherent to the data.
+            // Second part makes sure odd-sized sizes are also placed in the center.
+            dimension.innerPos = new Vec3f(
+                -center.X % 32 - (srcSize.X & 1) / 2f,
+                0,
+                -center.Z % 32 - (srcSize.Z & 1) / 2f
+            );
         }
     }
 
@@ -462,23 +472,32 @@ internal class BlockEntityMap : BlockEntity
         int cxmid = (dimId % 4096) * 512 + 256;
         int czmid = (dimId / 4096) * 512 + 256;
 
-        int shift = lod.shift();
+        // int shift = lod.shift();
         // Go to the lower edge (and do the correct rounding).
         // We need to divide by 2 because we're centered, then we need to divide by 32
         // to get chunk coordinates. But we need to round up, otherwise we'll be missing data.
         // Since we want the chunks to be centered after applying LOD we additionally have to
         // divide by the LOD size (or shift by its amount).
-        int cxstart = cxmid - ((sx + 62) >> (6 + shift));
-        int czstart = czmid - ((sz + 62) >> (6 + shift));
+        // int cxstart = cxmid - ((sx + 62) >> (6 + shift));
+        // int czstart = czmid - ((sz + 62) >> (6 + shift));
 
         system.LoadChunksV2(new CopyRequest(
             dimension!, // Only called if dimension is not null
             new BlockPos(
-                center.X - srcSize.X / 2,
+                center.X - sx / 2,
                 0,
-                center.Z - srcSize.Z / 2
+                center.Z - sz / 2,
+                0
             ),
-            new BlockPos(32 * cxmid - sx / 2, 0, 32 * czmid - sz / 2, 1),
+            new BlockPos(
+                // We're not changing chunk alignment for maximum performance.
+                // This means the destination must have the same offset within
+                // the chunk as the source. Without that any trimming would be wrong.
+                32 * cxmid + (center.X % 32) - sx / 2,
+                0,
+                32 * czmid + (center.Z % 32) - sz / 2,
+                1
+            ),
             srcSize
         ));
     }

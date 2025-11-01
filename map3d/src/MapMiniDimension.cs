@@ -12,6 +12,10 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
     ICoreAPI api;
     Map3DModSystem system;
     public float scale { get; set; }
+    // Additional translation applied after scale and rotation.
+    // Main purpose: Undoing unwanted translation within the dimension data
+    // (we get it due to keeping chunk alignment).
+    public Vec3f innerPos { get; set; }
 
     // Wish I wouldn't have to do this (I avoided it long enough), but we do need a way to list all
     // chunks in the dimension. This is a reference to the underlying BlockAccessorMovable, obtained
@@ -21,10 +25,11 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
     private Dictionary<long, IWorldChunk>? _chunks;
 
     // See https://github.com/bluelightning32/vs-dimensions-demo/blob/main/src/AnchoredDimension.cs
-    public MapMiniDimension(BlockAccessorBase parent, Vec3d pos, ICoreAPI api, float scale = 1f)
+    public MapMiniDimension(BlockAccessorBase parent, Vec3d pos, ICoreAPI api, float scale = 1f, Vec3f? innerPos = null)
         : base(parent, pos)
     {
         this.scale = scale;
+        this.innerPos = innerPos ?? Vec3f.Zero;
         this.api = api;
         this.system = api.ModLoader.GetModSystem<Map3DModSystem>();
         this._chunks = Map3DModSystem.readInternalField<BlockAccessorMovable, Dictionary<long, IWorldChunk>>(
@@ -57,13 +62,17 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
         // Skip the matrix math in the following cases:
         // - It would do nothing because we don't have rotation or scale
         // - I'm not 100% sure about initialization, so we also don't apply scale if it is zero (which isn't useful anyways).
-        if (
-            CurrentPos.Yaw == 0f && CurrentPos.Pitch == 0f && CurrentPos.Roll == 0f &&
-            (scale == 0f || scale == 1f)
-        )
-        {
-            return currentModelViewMatrix;
-        }
+        //
+        // Cannot be skipped this easily anymore because we need to take innerPos into account
+        // even if no scale or rotation is applied. At that point detecting when to skip might even
+        // be more expensive than applying the changes to the matrix.
+        // if (
+        //     CurrentPos.Yaw == 0f && CurrentPos.Pitch == 0f && CurrentPos.Roll == 0f &&
+        //     (scale == 0f || scale == 1f)
+        // )
+        // {
+        //     return currentModelViewMatrix;
+        // }
 
         // currentModelViewMatrix doesn't contain the translation to move it to the given block/origin,
         // nor is it added afterwards automatically. The BlockAccessorMovable implementation initially
@@ -93,13 +102,13 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
         Mat4f.Scale(array, array, scale, scale, scale);
         // Apply the rotation like the base class does (even though we don't use rotations, yet).
         ApplyCurrentRotation(array);
+        // Apply post-scale-and-rotation offsets (useful to undo offsets inherent to the data).
+        Mat4f.Translate(array, array, innerPos.X, innerPos.Y, innerPos.Z);
         // Undo the translation so things render where they should.
         return Mat4f.Translate(array, array, 0f - x, 0f - y, 0f - z);
     }
 
-
-    // TODO: Don't load all chunks in a single tick, that results in a giant lag spike.
-    public void LoadChunksServer(Vec3i size)
+    public void LoadChunksServer(Vec3i size, Vec3i alignUsing)
     {
         // TODO: Make sure the following gets updated to the new chunk aligned copying.
 
@@ -112,7 +121,12 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
         int cxmid = (subDimensionId % 4096) * 512 + 256;
         int czmid = (subDimensionId / 4096) * 512 + 256;
 
-        system.LoadChunksV2(new LoadRequest(this, new BlockPos(32 * cxmid - size.X / 2, 0, 32 * czmid - size.Z / 2, 1), size));
+        system.LoadChunksV2(new LoadRequest(this, new BlockPos(
+            32 * cxmid + (alignUsing.X % 32) - size.X / 2,
+            0,
+            32 * czmid + (alignUsing.Z % 32) - size.Z / 2,
+            1
+        ), size));
     }
 
     public void LoadChunk(ulong cindex, ServerChunk chunk)
