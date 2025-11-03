@@ -103,11 +103,6 @@
     "*-projector-*": { "base": "projector" }
   },
   "texturesByType": {
-    "*-projector-*": {
-      "cupronickel1": "game:block/metal/sheet-plain/{metal}1"
-    }
-  },
-  "texturesByType": {
     "*-tablewhitemarble-*": {
       "sides": { "base": "game:block/wood/table/normal/sides-whitemarble" },
       "top": { "base": "game:block/stone/polishedrock/whitemarble-inside" },
@@ -137,6 +132,9 @@
       "top": { "base": "game:block/wood/table/normal/top" },
       "bottom": { "base": "game:block/wood/table/normal/bottom" },
       "legs": { "base": "game:block/wood/table/normal/legs" }
+    },
+    "*-projector-*": {
+      "cupronickel1": { "base": "game:block/metal/sheet-plain/{metal}1" }
     }
   },
   "sidesolid": {
