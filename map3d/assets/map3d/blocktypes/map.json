@@ -99,11 +99,12 @@
     }
   },
   "shapeByType": {
-    "*-table*-*": {
-      "base": "game:block/wood/table"
-    },
+    "*-table*-*": { "base": "game:block/wood/table" },
+    "*-projector-*": { "base": "projector" }
+  },
+  "texturesByType": {
     "*-projector-*": {
-      "base": "game:block/devastation/machinery/miscmedium2"
+      "cupronickel1": "game:block/metal/sheet-plain/{metal}1"
     }
   },
   "texturesByType": {
