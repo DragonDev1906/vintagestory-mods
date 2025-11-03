@@ -134,7 +134,7 @@
       "legs": { "base": "game:block/wood/table/normal/legs" }
     },
     "*-projector-*": {
-      "cupronickel1": { "base": "game:block/metal/sheet-plain/{metal}1" }
+      "cupronickel1": { "base": "game:block/metal/plate/{metal}" }
     }
   },
   "sidesolid": {
@@ -151,14 +151,27 @@
     "break": "game:block/planks",
     "walk": "game:walk/wood"
   },
-  "heldTpIdleAnimation": "holdunderarm",
-  "tpHandTransform": {
-    "translation": { "x": -0.7, "y": -0.6, "z": -0.9 },
-    "rotation": { "x": 80, "y": 0, "z": 0 },
-    "scale": 0.56
+  "selectionBoxByType": {
+    "*-projector-*": {
+      "x1": 0.25,
+      "y1": 0.25,
+      "z1": 0.25,
+      "x2": 0.75,
+      "y2": 0.75,
+      "z2": 0.75
+    }
   },
+  "heldTpIdleAnimation": "holdbothhandslarge",
+  "heldTpUseAnimation": "twohandplaceblock",
   "fpHandTransform": {
-    "translation": { "x": 0.08, "y": -0.2, "z": 0.6 },
-    "rotation": { "x": 33, "y": 134, "z": -102 }
+    "translation": { "x": -0.4899, "y": -0.07, "z": -0.52 },
+    "rotation": { "x": 19, "y": 13, "z": -70 },
+    "origin": { "x": 0.5, "y": 0, "z": 0.5 },
+    "scale": 0.76
+  },
+  "tpHandTransform": {
+    "translation": { "x": -0.9, "y": -0.9, "z": -0.5 },
+    "rotation": { "x": 10, "y": 14, "z": -90 },
+    "scale": 0.6
   }
 }
