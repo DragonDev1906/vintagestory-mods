@@ -92,7 +92,7 @@ class BlockAccessorLod
     // public 
 
     // Avoid these unless you need the entire chunk, they can get expensive at higher Lod levels.
-    public ServerChunk? GetChunk(ulong cindex)
+    public ServerChunk? GetChunk(long cindex)
     {
         // Fast path
         if (lod == Lod.None)
@@ -111,7 +111,7 @@ class BlockAccessorLod
                 for (ushort x = 0; x < size; x++)
                 {
                     // Convert lod coordinates to real coordinates.
-                    ulong prelod = (cindex >> shift) + (ulong)x + ((ulong)z << 27) + ((ulong)y << 54);
+                    long prelod = (cindex >> shift) + (long)x + ((long)z << 27) + ((long)y << 54);
                     ServerChunk? chunk = db.loadChunk(prelod);
                     if (chunk != null)
                     {

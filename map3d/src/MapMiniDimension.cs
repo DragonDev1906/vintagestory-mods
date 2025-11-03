@@ -108,31 +108,15 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
         return Mat4f.Translate(array, array, 0f - x, 0f - y, 0f - z);
     }
 
-    public void LoadChunksServer(Vec3i size, Vec3i alignUsing)
+    public void LoadChunksServer(BlockPos pos, Vec3i size)
     {
-        // TODO: Make sure the following gets updated to the new chunk aligned copying.
-
-        // This is what our sub dimension coordinates are based on.
-        int sx = size.X;
-        int sz = size.Z;
-
-        // Start with the center of the subdimension, see AdjustPosForSubDimension which
-        // does this calculation with block coordinates instead of chunk coordinates.
-        int cxmid = (subDimensionId % 4096) * 512 + 256;
-        int czmid = (subDimensionId / 4096) * 512 + 256;
-
-        system.LoadChunksV2(new LoadRequest(this, new BlockPos(
-            32 * cxmid + (alignUsing.X % 32) - size.X / 2,
-            0,
-            32 * czmid + (alignUsing.Z % 32) - size.Z / 2,
-            1
-        ), size));
+        system.LoadChunksV2(new LoadRequest(this, pos, size));
     }
 
-    public void LoadChunk(ulong cindex, ServerChunk chunk)
+    public void LoadChunk(long cindex, ServerChunk chunk)
     {
-        system.AddChunkToLoadedListServer((long)cindex, chunk);
-        base.ReceiveClientChunk((long)cindex, chunk, api.World);
+        system.AddChunkToLoadedListServer(cindex, chunk);
+        base.ReceiveClientChunk(cindex, chunk, api.World);
         base.MarkChunkDirty(
             (int)((cindex & 0x1ff) << 5),
             (int)((cindex >> (42 - 5)) & 0x3ff0),

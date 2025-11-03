@@ -15,8 +15,8 @@ public interface IChunkLoader
     ILogger logger { get; }
     GameFile db { get; }
 
-    public ServerChunk? loadFromDB(ulong cindex);
-    public void Send(IChunkReceiver receiver, ulong cindex, ServerChunk chunk);
+    public ServerChunk? loadFromDB(long cindex);
+    public void Send(IChunkReceiver receiver, long cindex, ServerChunk chunk);
 }
 
 class ChunkLoader : IAsyncServerSystem, IChunkLoader
@@ -87,37 +87,12 @@ class ChunkLoader : IAsyncServerSystem, IChunkLoader
         this.db.Dispose();
     }
 
-    public ServerChunk? loadFromDB(ulong cindex)
+    public ServerChunk? loadFromDB(long cindex)
     {
-        // DB file uses a different indexing scheme.
-        // I'm not sure if this is the most efficient way, but we need the cindex regardless.
-
-        /*
-            cindex:
-            reserved 	dimension 	guard 	chunkY 	chunkZ 	chunkX
-            2 bits 	    10 bits 	1 bit 	9 bits 	21 bits 21 bits
-
-            cpos:
-            reserved 	chunkY 	dimension high part 	guard 	chunkZ 	dimension low part 	guard 	chunkX
-            1 bit 	    9 bits 	5 bit 	                1 bit 	21 bits 5 bits 	            1 bit 	21 bits
-
-RRDDDDDDDDDD_YYYYYYYYYZZZZZZZZZZZZZZZZZZZZZXXXXXXXXXXXXXXXXXXXXX
-_YYYYYYYYYDDDDD_ZZZZZZZZZZZZZZZZZZZZZDDDDD_XXXXXXXXXXXXXXXXXXXXX
-         */
-
-        ulong cpos = (cindex & 0x1fffff) // x
-            | ((cindex << 6) & ((ulong)0x1fffff << 27)) // z
-            | ((cindex << 12) & ((ulong)0x1ff << 54)) // y
-            | ((cindex >> 8) & ((ulong)0x1f << 49)) // dim upper
-            | ((cindex >> 30) & ((ulong)0x1f << 22)); // dim lower
-
-        if (((cindex >> 42) & 0xff) == 0)
-            logger.Notification("cpos: {0}", cpos);
-
-        return db.loadChunk(cpos);
+        return db.loadChunk(cindex);
     }
 
-    public void Send(IChunkReceiver receiver, ulong cindex, ServerChunk chunk)
+    public void Send(IChunkReceiver receiver, long cindex, ServerChunk chunk)
     {
         api.EnqueueMainThreadTask(delegate { receiver.LoadChunk(cindex, chunk); }, "map3d-loadchunk");
     }

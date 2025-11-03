@@ -42,6 +42,52 @@ internal class BlockEntityMap : BlockEntity
         }
     }
 
+    private Vec3i dimSize
+    {
+        get
+        {
+            // TODO: Probably not pixel-accurate.
+            int shift = lod.shift();
+            return new Vec3i(
+                srcSize.X >> shift,
+                srcSize.Y >> shift,
+                srcSize.Z >> shift
+            );
+        }
+    }
+    private BlockPos dimCorner
+    {
+        get
+        {
+            int cxmid = (dimId % 4096) * 512 + 256;
+            int czmid = (dimId / 4096) * 512 + 256;
+
+            // TODO: Accurately handle LOD
+            //
+            // We're not changing chunk alignment for maximum performance.
+            // This means the destination must have the same offset within
+            // the chunk as the source. Without that any trimming would be wrong.
+            return new BlockPos(
+                32 * cxmid + center.X % 32 - dimSize.X / 2,
+                0,
+                32 * czmid + center.Z % 32 - dimSize.Z / 2,
+                1
+            );
+        }
+    }
+    private BlockPos srcCorner
+    {
+        get
+        {
+            return new BlockPos(
+                center.X - srcSize.X / 2,
+                0,
+                center.Z - srcSize.Z / 2,
+                0
+            );
+        }
+    }
+
     // How and where should it be rendered.
     internal Vec3i offset = Vec3i.Zero; // In voxels (1/32 pixel)
     internal Vec3f rotation = Vec3f.Zero;
@@ -132,7 +178,7 @@ internal class BlockEntityMap : BlockEntity
 
             // Load the chunks
             // We could also lazily load these only after the first player said he is ready for chunks.
-            dimension.LoadChunksServer(srcSize, center.AsVec3i);
+            dimension.LoadChunksServer(dimCorner, srcSize);
         }
     }
 
@@ -483,22 +529,10 @@ internal class BlockEntityMap : BlockEntity
 
         system.LoadChunksV2(new CopyRequest(
             dimension!, // Only called if dimension is not null
-            new BlockPos(
-                center.X - sx / 2,
-                0,
-                center.Z - sz / 2,
-                0
-            ),
-            new BlockPos(
-                // We're not changing chunk alignment for maximum performance.
-                // This means the destination must have the same offset within
-                // the chunk as the source. Without that any trimming would be wrong.
-                32 * cxmid + (center.X % 32) - sx / 2,
-                0,
-                32 * czmid + (center.Z % 32) - sz / 2,
-                1
-            ),
-            srcSize
+            srcCorner,
+            dimCorner,
+            srcSize,
+            lod
         ));
     }
 

@@ -21,7 +21,7 @@ public interface IChunkRequest
 }
 public interface IChunkReceiver
 {
-    void LoadChunk(ulong cindex, ServerChunk chunk);
+    void LoadChunk(long cindex, ServerChunk chunk);
 }
 
 public abstract class QubeRequest : IChunkRequest
@@ -38,7 +38,7 @@ public abstract class QubeRequest : IChunkRequest
     }
 
     // There is probably a better place to put this.
-    internal static ulong ToChunkIndex(BlockPos pos)
+    internal static long ToChunkIndex(BlockPos pos)
     {
         return ToChunkIndex(pos.X / 32, pos.InternalY / 32, pos.Z / 32);
         // return (
@@ -47,12 +47,12 @@ public abstract class QubeRequest : IChunkRequest
         //     ((ulong)(pos.InternalY / 32) << 42)  // Includes the dimension
         // );
     }
-    internal static ulong ToChunkIndex(int cx, int cyinternal, int cz)
+    internal static long ToChunkIndex(int cx, int cyinternal, int cz)
     {
         return (
-            (ulong)cx +
-            ((ulong)cz << 21) +
-            ((ulong)cyinternal << 42)  // Includes the dimension
+            (long)cx +
+            ((long)cz << 21) +
+            ((long)cyinternal << 42)  // Includes the dimension
         );
     }
 
@@ -62,7 +62,7 @@ public abstract class QubeRequest : IChunkRequest
         int csy = (pos.Y + size.Y + 31) / 32 - pos.Y / 32;
         int csz = (pos.Z + size.Z + 31) / 32 - pos.Z / 32;
 
-        ulong cpos = ToChunkIndex(pos);
+        long cpos = ToChunkIndex(pos);
         bool t = trim();
         // ulong cpos = (
         //     (ulong)(pos.X / 32) +
@@ -80,7 +80,7 @@ public abstract class QubeRequest : IChunkRequest
             {
                 for (int y = 0; y < csy; y++)
                 {
-                    ulong cindex = cpos + QubeRequest.ToChunkIndex(x, y, z);
+                    long cindex = cpos + QubeRequest.ToChunkIndex(x, y, z);
                     ServerChunk? chunk = get_chunk(l, cindex);
                     if (chunk != null && !chunk.Empty)
                     {
@@ -114,14 +114,14 @@ public abstract class QubeRequest : IChunkRequest
 
     protected virtual bool trim() { return false; }
 
-    protected abstract ServerChunk? get_chunk(IChunkLoader loader, ulong cindex);
+    protected abstract ServerChunk? get_chunk(IChunkLoader loader, long cindex);
 }
 
 public class LoadRequest : QubeRequest
 {
     public LoadRequest(IChunkReceiver receiver, BlockPos pos, Vec3i size) : base(receiver, pos, size) { }
 
-    protected override ServerChunk? get_chunk(IChunkLoader loader, ulong cindex)
+    protected override ServerChunk? get_chunk(IChunkLoader loader, long cindex)
     {
         return loader.loadFromDB(cindex);
     }
@@ -131,15 +131,17 @@ public class LoadRequest : QubeRequest
 // of being off by up to 32 blocks.
 public class CopyRequest : QubeRequest
 {
-    public ulong offset;
+    public long offset;
     public Lod lod;
 
     BlockAccessorLod? ba;
 
     // Position is the corner, not the center.
-    public CopyRequest(IChunkReceiver receiver, BlockPos src, BlockPos dst, Vec3i size) : base(receiver, dst, size)
+    public CopyRequest(IChunkReceiver receiver, BlockPos src, BlockPos dst, Vec3i size, Lod lod = Lod.None)
+        : base(receiver, dst, size)
     {
         offset = QubeRequest.ToChunkIndex(src) - QubeRequest.ToChunkIndex(dst);
+        this.lod = lod;
     }
 
     public override void process_all(IChunkLoader l)
@@ -148,11 +150,11 @@ public class CopyRequest : QubeRequest
         base.process_all(l);
     }
 
-    protected override ServerChunk? get_chunk(IChunkLoader loader, ulong cindex)
+    protected override ServerChunk? get_chunk(IChunkLoader loader, long cindex)
     {
         // Only called by process_all, which sets ba.
-        // ServerChunk? chunk = ba!.GetChunk(cindex + offset);
-        ServerChunk? chunk = loader.loadFromDB(cindex + offset);
+        ServerChunk? chunk = ba!.GetChunk(cindex + offset);
+        // ServerChunk? chunk = loader.loadFromDB(cindex + offset);
         if (chunk == null)
             return null;
 
