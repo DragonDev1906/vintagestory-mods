@@ -1,0 +1,11 @@
+{
+  "type": "code",
+  "modid": "heatstone",
+  "name": "Heatstone",
+  "authors": ["Zokora", "StarLynx"],
+  "description": "Adds a wearable, rechargable heat source",
+  "version": "0.0.1",
+  "dependencies": {
+    "game": ""
+  }
+}
