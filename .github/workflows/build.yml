@@ -25,7 +25,11 @@ jobs:
         id: determine
         run: |
           mods=$(./discover.sh)
-          echo "mods=$mods" >> "$GITHUB_OUTPUT"
+          {
+            echo "mods<<EOF"
+            echo "$mods"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
           echo "Build matrix: $mods"
         env:
           EVENT: ${{ github.event_name }}
