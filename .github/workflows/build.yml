@@ -73,6 +73,6 @@ jobs:
       - name: Upload ${{ matrix.mod }}_${{ steps.version.outputs.version }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.mod }}_${{ steps.version.outputs.version }}
           path: Releases/${{ matrix.mod }}_${{ steps.version.outputs.version }}.zip
+          archive: false
           if-no-files-found: error
