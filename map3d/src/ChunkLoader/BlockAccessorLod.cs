@@ -102,7 +102,7 @@ class BlockAccessorLod
 
         ServerChunk lodchunk = ServerChunk.CreateNew(db.chunkPool);
         lodchunk.Unpack();
-        lodchunk.Lighting.FloodWithSunlight(18);
+        lodchunk.Lighting.FillWithSunlight(18);
 
         // To get a complete chunk we need all individual chunks in it.
         // Again: Let's be somewhat cache friendly in the way we iterate

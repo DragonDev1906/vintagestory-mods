@@ -74,12 +74,12 @@ namespace TranslocatorDirectionIndicator
             int b = 172;
             directionParticles.Color = (r << 16) | (g << 8) | (b << 0) | (100 << 24);
 
-            directionParticles.BlueEvolve = null;
-            directionParticles.RedEvolve = null;
-            directionParticles.GreenEvolve = null;
+            directionParticles.BlueEvolve = EvolvingNatFloat.NoValueSet;
+            directionParticles.RedEvolve = EvolvingNatFloat.NoValueSet;
+            directionParticles.GreenEvolve = EvolvingNatFloat.NoValueSet;
             directionParticles.MinSize = 0.1f;
             directionParticles.MaxSize = 0.11f;
-            directionParticles.SizeEvolve = null;
+            directionParticles.SizeEvolve = EvolvingNatFloat.NoValueSet;
             directionParticles.OpacityEvolve = EvolvingNatFloat.create(EnumTransformFunction.QUADRATIC, -10f);
 
             // directionParticles.MinPos.Set(Pos.X, Pos.Y, Pos.Z);

@@ -67,7 +67,7 @@ public class Map3DModSystem : ModSystem
             return;
         }
 
-        ChunkLoader chunkLoader = new(sapi.Event, this, chunkLoadQueue, Mod.Logger, chunkPool, sapi.World, sapi.WorldManager.CurrentWorldName);
+        ChunkLoader chunkLoader = new(sapi.Event, this, chunkLoadQueue, Mod.Logger, chunkPool, sapi.World, sapi.WorldManager.CurrentWorldFilepath);
         Mod.Logger.Notification("Started ChunkLoader thread");
         sapi.Server.AddServerThread("map3d-chunkload", chunkLoader);
 

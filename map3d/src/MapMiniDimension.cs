@@ -270,7 +270,7 @@ public class MapMiniDimension : BlockAccessorMovable, IMiniDimension, IChunkRece
         {
             chunk.Unpack();
             if (chunk.Empty)
-                chunk.Lighting.FloodWithSunlight(18);
+                chunk.Lighting.FillWithSunlight(18);
         }
 
         Block block = api.World.Blocks[blockId];
