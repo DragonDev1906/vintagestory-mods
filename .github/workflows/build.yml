@@ -6,8 +6,28 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      mods: ${{ steps.list.outputs.mods }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: List mods
+        id: list
+        run: |
+          mods=$(find -type f -name modinfo.json -not -path '*/bin/*' -not -path '*/Releases/*' \
+            | sed 's_^\./\([^/]*\)/.*_\1_' | sort -u | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          echo "mods=$mods" >> "$GITHUB_OUTPUT"
+          echo "Found mods: $mods"
+
+  build:
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mod: ${{ fromJSON(needs.discover.outputs.mods) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -20,21 +40,32 @@ jobs:
       - name: Install json5
         run: npm install -g json5
 
+      - name: Cache Vintage Story server
+        id: cache-vs
+        uses: actions/cache@v4
+        with:
+          path: ~/vs
+          key: vs-server-linux-x64-1.22.6
+
       - name: Download Vintage Story server (for API DLLs)
+        if: steps.cache-vs.outputs.cache-hit != 'true'
         run: |
           set -e
           curl -sSL -o vs_server.tar.gz "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_1.22.6.tar.gz"
-          mkdir -p "$HOME/vs"
-          tar -xzf vs_server.tar.gz -C "$HOME/vs"
-          DLL_DIR="$(dirname "$(find "$HOME/vs" -name VintagestoryAPI.dll | head -1)")"
+          mkdir -p ~/vs
+          tar -xzf vs_server.tar.gz -C ~/vs
+
+      - name: Export VINTAGE_STORY
+        run: |
+          DLL_DIR="$(dirname "$(find ~/vs -name VintagestoryAPI.dll | head -1)")"
           echo "VINTAGE_STORY=$DLL_DIR" >> "$GITHUB_ENV"
 
-      - name: Build all mods
-        run: ./build.sh
+      - name: Build ${{ matrix.mod }}
+        run: ./build.sh "${{ matrix.mod }}"
 
-      - name: Upload mod zips
+      - name: Upload ${{ matrix.mod }}
         uses: actions/upload-artifact@v4
         with:
-          name: releases
-          path: Releases/*.zip
+          name: ${{ matrix.mod }}
+          path: Releases/${{ matrix.mod }}_*.zip
           if-no-files-found: error

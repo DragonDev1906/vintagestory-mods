@@ -45,33 +45,53 @@ for mod in $mods; do
     rm -rf -- "$output" "$compile_output"
 
     # Check general json validity
-    jsonfiles=$(find "$mod/assets/" -type f -name '*.json')
-    for f in $jsonfiles; do
-        # TODO: We may want to check the schema (based on the path the file is in)
-        if ! json5 -v "$f"; then
-            error "Invalid json5"
-            continue 2
-        fi
-    done
-
-    # Compile
-    if [ -f "$mod/$mod.csproj" ]; then
-        dotnet publish "$mod/$mod.csproj" -c Release
+    if [ -d "$mod/assets" ]; then
+        jsonfiles=$(find "$mod/assets/" -type f -name '*.json')
+        for f in $jsonfiles; do
+            # TODO: We may want to check the schema (based on the path the file is in)
+            if ! json5 -v "$f"; then
+                error "Invalid json5"
+                continue 2
+            fi
+        done
     fi
 
-    # Build zip file
-    # I have not found a better way to do this than having separate zip commands.
-    cd "$mod"
-    zip -rq "../$output" \
-        "assets" \
-        "modinfo.json" \
-        "modicon.png" \
-        "README.md"
+    # Compile; a C# project must compile successfully and produce output
+    if [ -f "$mod/$mod.csproj" ]; then
+        if ! dotnet publish "$mod/$mod.csproj" -c Release; then
+            error "Failed to compile '$mod'"
+            continue
+        fi
+        if [ ! -d "$compile_output" ] || [ -z "$(ls -A "$compile_output")" ]; then
+            error "Compilation of '$mod' produced no output"
+            continue
+        fi
+    fi
 
-    # Add dll
+    # Build zip file, only including files that exist
+    if ! cd "$mod"; then
+        error "Could not enter '$mod'"
+        continue
+    fi
+    zip_files="modinfo.json"
+    for f in assets modicon.png README.md; do
+        [ -e "$f" ] && zip_files="$zip_files $f"
+    done
+    if ! zip -rq "../$output" $zip_files; then
+        error "Failed to zip '$mod'"
+        rm -f -- "$root/$output"
+        cd "$root"
+        continue
+    fi
+
+    # Add the compiled dll if there is a C# project
     if [ -f "$mod.csproj" ]; then
-        cd "bin/Release/Mods/mod/publish"
-        zip -rq "$root/$output" .
+        if ! (cd "bin/Release/Mods/mod/publish" && zip -rq "$root/$output" .); then
+            error "Failed to add dll to zip for '$mod'"
+            rm -f -- "$root/$output"
+            cd "$root"
+            continue
+        fi
     fi
 
     # Reset working directory
