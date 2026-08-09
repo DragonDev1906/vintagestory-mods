@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Map3D", "map3d\map3d.csproj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TranslocatorDirectionIndicator", "translocatordirectionindicator\translocatordirectionindicator.csproj", "{CB2100BC-F653-402A-9FBA-EA463C2BD4FC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Heatstone", "heatstone\heatstone.csproj", "{CB2100BC-F653-402A-9FBA-EA463C2BD4FC}"
+EndProject
 
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
