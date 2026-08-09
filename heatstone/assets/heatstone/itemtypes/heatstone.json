@@ -1,6 +1,8 @@
 {
   "code": "heatstone",
-  "class": "heatstone.ItemHeatWearable",
+  "behaviors": [
+    { "name": "HeatWearable" }
+  ],
   "maxstacksize": 1,
   "attributes": {
     "warmth": 50,
