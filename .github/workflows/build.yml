@@ -4,30 +4,42 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      mods:
+        description: 'Comma-separated list of mods to build (or "all")'
+        required: false
+        default: 'all'
 
 jobs:
   discover:
     runs-on: ubuntu-latest
     outputs:
-      mods: ${{ steps.list.outputs.mods }}
+      mods: ${{ steps.determine.outputs.mods }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      - name: List mods
-        id: list
+      - name: Determine mods to build
+        id: determine
         run: |
-          mods=$(find -type f -name modinfo.json -not -path '*/bin/*' -not -path '*/Releases/*' \
-            | sed 's_^\./\([^/]*\)/.*_\1_' | sort -u | jq -R -s -c 'split("\n") | map(select(. != ""))')
+          mods=$(./discover.sh)
           echo "mods=$mods" >> "$GITHUB_OUTPUT"
-          echo "Found mods: $mods"
+          echo "Build matrix: $mods"
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          INPUT_MODS: ${{ github.event.inputs.mods }}
 
   build:
     needs: discover
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        mod: ${{ fromJSON(needs.discover.outputs.mods) }}
+        include: ${{ fromJSON(needs.discover.outputs.mods) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -67,10 +79,11 @@ jobs:
           DLL_DIR="$(dirname "$(find ~/vs -name VintagestoryAPI.dll | head -1)")"
           echo "VINTAGE_STORY=$DLL_DIR" >> "$GITHUB_ENV"
 
-      - name: Build ${{ matrix.mod }} ${{ steps.version.outputs.version }}
+      - name: Build ${{ matrix.mod }}
         run: ./build.sh "${{ matrix.mod }}"
 
       - name: Upload ${{ matrix.mod }}_${{ steps.version.outputs.version }}
+        if: matrix.upload
         uses: actions/upload-artifact@v7
         with:
           path: Releases/${{ matrix.mod }}_${{ steps.version.outputs.version }}.zip
