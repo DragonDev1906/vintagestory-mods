@@ -1,7 +1,7 @@
 {
   "code": "heatstone",
   "behaviors": [
-    { "name": "HeatWearable" }
+    { "name": "heatstone.HeatWearable" }
   ],
   "maxstacksize": 1,
   "attributes": {
