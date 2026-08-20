@@ -1,0 +1,36 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code
+*.cs text diff=csharp
+*.csproj text
+*.sln text eol=crlf
+
+# Scripts (force LF)
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Windows scripts (force CRLF)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Config / data
+*.json text
+*.json5 text
+*.xml text
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Assets - images
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tga binary
+
+# Compiled output
+*.dll binary
+*.zip binary
+*.tar.gz binary
