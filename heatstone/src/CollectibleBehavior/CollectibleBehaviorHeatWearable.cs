@@ -69,6 +69,8 @@ public class CollectibleBehaviorHeatWearable : CollectibleBehaviorWearable
         attr.SetDouble("temperatureLastUpdate", now);
         attr.SetFloat("temperature", temperature);
 
+        handling = EnumHandling.PreventDefault;
+
         // Make sure it's still the correct value.
         // NOTE: Don't know if we still need this, keeping it for now.
         attr.SetFloat("cooldownSpeed", (collObj.Attributes?["cooldownSpeed"].AsFloat() ?? 90));
