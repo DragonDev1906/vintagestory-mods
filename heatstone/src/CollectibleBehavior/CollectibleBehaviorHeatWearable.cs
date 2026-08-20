@@ -83,7 +83,9 @@ public class CollectibleBehaviorHeatWearable : CollectibleBehaviorWearable
         float maxWarmth = inslot.Itemstack.ItemAttributes?["warmth"].AsFloat(0) ?? 0;
         float mul = inslot.Itemstack.ItemAttributes?["warmthPerTempDeg"].AsFloat(0) ?? 0;
         float temp = inslot.Itemstack.Item.GetTemperature(api.World, inslot.Itemstack);
-        return Math.Max(0, Math.Min(maxWarmth, (temp - 20) * mul));
+        float condition = inslot.Itemstack.Attributes.GetFloat("condition", 1f);
+        float temperatureWarmth = Math.Max(0, Math.Min(maxWarmth, (temp - 20) * mul));
+        return temperatureWarmth * Math.Min(1, condition * 2);
     }
 
     public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder dsc, IWorldAccessor world, bool withDebugInfo)
