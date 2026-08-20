@@ -11,6 +11,8 @@ namespace Heatstone;
 ///   to specify passive temperature drain.
 /// - "hoursToDrainCondition" (float): Hours it takes to drain the items temperature
 ///   while wearing it. Does not include the time from cooldownSpeed.
+/// - "disableDirectRepair" (bool): When true, prevents twine/linen/sewing kit from
+///   being applied directly to this item in the inventory to repair it.
 ///
 /// # OLD
 /// ## Added/Most relevant attributes
@@ -87,5 +89,31 @@ public class CollectibleBehaviorHeatWearable : CollectibleBehaviorWearable
     public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder dsc, IWorldAccessor world, bool withDebugInfo)
     {
         base.GetHeldItemInfo(inSlot, dsc, world, withDebugInfo);
+    }
+
+    public override int GetMergableQuantity(ItemStack sinkStack, ItemStack sourceStack, EnumMergePriority priority, ref EnumHandling handling)
+    {
+        if (collObj.Attributes?["disableDirectRepair"].AsBool() == true
+            && priority == EnumMergePriority.DirectMerge
+            && (sourceStack?.ItemAttributes?["clothingRepairStrength"].AsFloat(0) ?? 0) > 0)
+        {
+            handling = EnumHandling.PreventDefault;
+            return 0;
+        }
+
+        return base.GetMergableQuantity(sinkStack, sourceStack, priority, ref handling);
+    }
+
+    public override void TryMergeStacks(ItemStackMergeOperation op, ref EnumHandling handling)
+    {
+        if (collObj.Attributes?["disableDirectRepair"].AsBool() == true
+            && op.CurrentPriority == EnumMergePriority.DirectMerge
+            && (op.SourceSlot.Itemstack.ItemAttributes?["clothingRepairStrength"].AsFloat(0) ?? 0) > 0)
+        {
+            handling = EnumHandling.PreventDefault;
+            return;
+        }
+
+        base.TryMergeStacks(op, ref handling);
     }
 }

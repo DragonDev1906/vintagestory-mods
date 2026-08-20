@@ -10,7 +10,8 @@
     "cooldownSpeed": 90,
     "heatingRate": 0.1,
     "maxTemperature": 200,
-    "allowHeating": true
+    "allowHeating": true,
+    "disableDirectRepair": true
   },
   "shape": { "base": "game:item/stone" },
   "textures": {
